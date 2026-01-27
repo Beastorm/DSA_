@@ -13,22 +13,16 @@ Given a string `num` that contains only digits and an integer `target`, return a
 >### Examples:
 
 ### Example 1:
-**Input:**  
-`num = "123"`, `target = 6`  
-**Output:**  
-`["1+2+3", "1*2*3"]`  
-**Explanation:**  
-Both expressions evaluate to `6`.
+**Input:** `num = "123"`, `target = 6`    
+**Output:** `["1+2+3", "1*2*3"]`    
+**Explanation:** Both expressions evaluate to `6`.    
 
 ---
 
 ### Example 2:
-**Input:**  
-`num = "232"`, `target = 8`  
-**Output:**  
-`["2+3*2", "2*3+2"]`  
-**Explanation:**  
-Both expressions evaluate to `8`.
+**Input:** `num = "232"`, `target = 8`    
+**Output:** `["2+3*2", "2*3+2"]`    
+**Explanation:** Both expressions evaluate to `8`.   
 
 ---
 ## Approach
@@ -37,14 +31,14 @@ Both expressions evaluate to `8`.
 
 Need to insert operators (`+`, `-`, `*`) between digits to reach the target value. Challenge: handle operator precedence (`*` before `+` or `-`) without evaluating the full expression each time.
 
-Key Insight: Track two values:
+**Key Insight:** Track two values:
 - eval: current expression value
 - prev: last operand (needed to "undo" it when '*' appears)
 
 For multiplication, we undo the last operation and redo it with multiplication:
 eval - prev + (prev * curr)
 
-Example: "2+3*4" when we reach '*4', undo the '+3', then add '3*4'
+**Example:** "2+3*4" when we reach '*4', undo the '+3', then add '3*4'
 
 ### Algorithm:
 
@@ -177,12 +171,12 @@ int main() {
 
 ### Complexity Analysis:
 
-**Time Complexity:** O(4^n)
-- At each digit, branch into approximately 4 choices (3 operators + varying number lengths)
-- n = length of input string
-- Actual complexity closer to O(3^n * n) due to pruning
+- **Time Complexity:** O(4^n)
+   - At each digit, branch into approximately 4 choices (3 operators + varying number lengths)
+   - n = length of input string
+   - Actual complexity closer to O(3^n * n) due to pruning
 
-**Space Complexity:** O(n)
-- Recursion depth: O(n)
-- String path: O(n)
-- Result storage is not counted in the space complexity analysis
+- **Space Complexity:** O(n)
+   - Recursion depth: O(n)
+   - String path: O(n)
+   - Result storage is not counted in the space complexity analysis
