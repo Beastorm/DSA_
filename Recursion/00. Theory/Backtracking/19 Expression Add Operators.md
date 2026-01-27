@@ -88,85 +88,109 @@ eval - prev + (prev * curr)
 #include <string>
 using namespace std;
 
-class Solution {
+class ExpressionBuilder {
 public:
-    vector<string> res;
+    vector<string> validExpressions;
 
-    void dfs(string& num, int target, int pos, long eval, long prev, string path) {
-        if (pos == num.size()) {
-            if (eval == target) res.push_back(path);
+    void findExpressionsRecursive(string& digitString, int targetValue, int currentIndex, 
+                                   long currentResult, long previousOperand, string currentExpression) {
+        // Base case: processed all digits
+        if (currentIndex == digitString.size()) {
+            if (currentResult == targetValue) {
+                validExpressions.push_back(currentExpression);
+            }
             return;
         }
 
-        for (int i = pos; i < num.size(); i++) {
-            // Skip numbers with leading zeros
-            if (i != pos && num[pos] == '0') break;
+        // Try all possible operand lengths starting from current position
+        for (int endIndex = currentIndex; endIndex < digitString.size(); endIndex++) {
+            // Skip numbers with leading zeros (except single '0')
+            if (endIndex != currentIndex && digitString[currentIndex] == '0') break;
 
-            string currStr = num.substr(pos, i - pos + 1);
-            long curr = stol(currStr);
+            string operandString = digitString.substr(currentIndex, endIndex - currentIndex + 1);
+            long operandValue = stol(operandString);
 
-            if (pos == 0) {
-                // First number, no operator preceding it
-                dfs(num, target, i + 1, curr, curr, currStr);
+            if (currentIndex == 0) {
+                // First operand: no operator preceding it
+                findExpressionsRecursive(digitString, targetValue, endIndex + 1, 
+                                         operandValue, operandValue, operandString);
             } else {
-                // Try all 3 operators
-                dfs(num, target, i + 1, eval + curr, curr, path + "+" + currStr);
-                dfs(num, target, i + 1, eval - curr, -curr, path + "-" + currStr);
-                dfs(num, target, i + 1, eval - prev + prev * curr, prev * curr, path + "*" + currStr);
+                // Try all 3 operators: +, -, *
+                
+                // Addition: simply add to the current result
+                findExpressionsRecursive(digitString, targetValue, endIndex + 1, 
+                                         currentResult + operandValue, 
+                                         operandValue, 
+                                         currentExpression + "+" + operandString);
+                
+                // Subtraction: subtract from current result (store negative for potential multiplication)
+                findExpressionsRecursive(digitString, targetValue, endIndex + 1, 
+                                         currentResult - operandValue, 
+                                         -operandValue, 
+                                         currentExpression + "-" + operandString);
+                
+                // Multiplication: undo previous operation, apply multiplication with higher precedence
+                findExpressionsRecursive(digitString, targetValue, endIndex + 1, 
+                                         currentResult - previousOperand + previousOperand * operandValue, 
+                                         previousOperand * operandValue, 
+                                         currentExpression + "*" + operandString);
             }
         }
     }
 
-    vector<string> addOperators(string num, int target) {
-        res.clear();
-        if (num.empty()) return {};
-        dfs(num, target, 0, 0, 0, "");
-        return res;
+    vector<string> findAllValidExpressions(string digitString, int targetValue) {
+        validExpressions.clear();
+        if (digitString.empty()) return {};
+        findExpressionsRecursive(digitString, targetValue, 0, 0, 0, "");
+        return validExpressions;
     }
 };
 
 int main() {
-    Solution sol;
+    ExpressionBuilder builder;
 
-    string num1 = "123";
-    int target1 = 6;
-    vector<string> result1 = sol.addOperators(num1, target1);
-    cout << "Input: num = \"" << num1 << "\", target = " << target1 << "\nOutput:\n";
-    for (const string& expr : result1) {
-        cout << expr << endl;
+    // Test case 1
+    string inputDigits1 = "123";
+    int targetValue1 = 6;
+    vector<string> expressions1 = builder.findAllValidExpressions(inputDigits1, targetValue1);
+    cout << "Input: digits = \"" << inputDigits1 << "\", target = " << targetValue1 << "\nOutput:\n";
+    for (const string& expression : expressions1) {
+        cout << expression << endl;
     }
     cout << endl;
 
-    string num2 = "232";
-    int target2 = 8;
-    vector<string> result2 = sol.addOperators(num2, target2);
-    cout << "Input: num = \"" << num2 << "\", target = " << target2 << "\nOutput:\n";
-    for (const string& expr : result2) {
-        cout << expr << endl;
+    // Test case 2
+    string inputDigits2 = "232";
+    int targetValue2 = 8;
+    vector<string> expressions2 = builder.findAllValidExpressions(inputDigits2, targetValue2);
+    cout << "Input: digits = \"" << inputDigits2 << "\", target = " << targetValue2 << "\nOutput:\n";
+    for (const string& expression : expressions2) {
+        cout << expression << endl;
     }
     cout << endl;
 
-    string num3 = "105";
-    int target3 = 5;
-    vector<string> result3 = sol.addOperators(num3, target3);
-    cout << "Input: num = \"" << num3 << "\", target = " << target3 << "\nOutput:\n";
-    for (const string& expr : result3) {
-        cout << expr << endl;
+    // Test case 3
+    string inputDigits3 = "105";
+    int targetValue3 = 5;
+    vector<string> expressions3 = builder.findAllValidExpressions(inputDigits3, targetValue3);
+    cout << "Input: digits = \"" << inputDigits3 << "\", target = " << targetValue3 << "\nOutput:\n";
+    for (const string& expression : expressions3) {
+        cout << expression << endl;
     }
     cout << endl;
 
-    string num4 = "00";
-    int target4 = 0;
-    vector<string> result4 = sol.addOperators(num4, target4);
-    cout << "Input: num = \"" << num4 << "\", target = " << target4 << "\nOutput:\n";
-    for (const string& expr : result4) {
-        cout << expr << endl;
+    // Test case 4: Leading zeros
+    string inputDigits4 = "00";
+    int targetValue4 = 0;
+    vector<string> expressions4 = builder.findAllValidExpressions(inputDigits4, targetValue4);
+    cout << "Input: digits = \"" << inputDigits4 << "\", target = " << targetValue4 << "\nOutput:\n";
+    for (const string& expression : expressions4) {
+        cout << expression << endl;
     }
     cout << endl;
 
     return 0;
 }
-
 ```
 
 ### Complexity Analysis:
