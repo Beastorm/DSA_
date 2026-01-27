@@ -117,7 +117,7 @@ public:
             } else {
                 // Try all 3 operators: +, -, *
                 
-                // Addition: simply add to the current result
+                // Addition: add to the current result
                 findExpressionsRecursive(digitString,                             // input
                                          targetValue,                             // target value
                                          endIndex + 1,                            // current index
@@ -127,21 +127,21 @@ public:
                                          );
                 
                 // Subtraction: subtract from current result (store negative for potential multiplication)
-                findExpressionsRecursive(digitString, 
-                                         targetValue, 
-                                         endIndex + 1, 
-                                         currentResult - operandValue, 
-                                         -operandValue, 
-                                         currentExpression + "-" + operandString
+                findExpressionsRecursive(digitString,                             // input
+                                         targetValue,                             // target value
+                                         endIndex + 1,                            // current index
+                                         currentResult - operandValue,            // current result
+                                         -operandValue,                           // previous operand
+                                         currentExpression + "-" + operandString  // current expression
                                          );
                 
                 // Multiplication: undo previous operation, apply multiplication with higher precedence
-                findExpressionsRecursive(digitString, 
-                                         targetValue, 
-                                         endIndex + 1, 
-                                         currentResult - previousOperand + previousOperand * operandValue, 
-                                         previousOperand * operandValue, 
-                                         currentExpression + "*" + operandString
+                findExpressionsRecursive(digitString,                                                      // input            
+                                         targetValue,                                                      // target value
+                                         endIndex + 1,                                                     // current index
+                                         currentResult - previousOperand + previousOperand * operandValue, // current result
+                                         previousOperand * operandValue,                                   // previous operand
+                                         currentExpression + "*" + operandString                           // current expression
                                          );
             }
         }
