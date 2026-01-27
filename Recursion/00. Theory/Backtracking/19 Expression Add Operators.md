@@ -118,22 +118,31 @@ public:
                 // Try all 3 operators: +, -, *
                 
                 // Addition: simply add to the current result
-                findExpressionsRecursive(digitString, targetValue, endIndex + 1, 
-                                         currentResult + operandValue, 
-                                         operandValue, 
-                                         currentExpression + "+" + operandString);
+                findExpressionsRecursive(digitString,                             // input
+                                         targetValue,                             // target value
+                                         endIndex + 1,                            // current index
+                                         currentResult + operandValue,            // current result
+                                         operandValue,                            // previous operand
+                                         currentExpression + "+" + operandString  // current expression
+                                         );
                 
                 // Subtraction: subtract from current result (store negative for potential multiplication)
-                findExpressionsRecursive(digitString, targetValue, endIndex + 1, 
+                findExpressionsRecursive(digitString, 
+                                         targetValue, 
+                                         endIndex + 1, 
                                          currentResult - operandValue, 
                                          -operandValue, 
-                                         currentExpression + "-" + operandString);
+                                         currentExpression + "-" + operandString
+                                         );
                 
                 // Multiplication: undo previous operation, apply multiplication with higher precedence
-                findExpressionsRecursive(digitString, targetValue, endIndex + 1, 
+                findExpressionsRecursive(digitString, 
+                                         targetValue, 
+                                         endIndex + 1, 
                                          currentResult - previousOperand + previousOperand * operandValue, 
                                          previousOperand * operandValue, 
-                                         currentExpression + "*" + operandString);
+                                         currentExpression + "*" + operandString
+                                         );
             }
         }
     }
