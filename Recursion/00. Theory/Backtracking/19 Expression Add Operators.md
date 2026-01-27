@@ -40,6 +40,7 @@ eval - prev + (prev * curr)
 
 **Example:** "2+3*4" when we reach '*4', undo the '+3', then add '3*4'
 
+---
 
 ### Why Subtract Then Add?
 
@@ -54,8 +55,9 @@ eval - prev + (prev * curr)
 
 **Steps:** Undo `+3` → Multiply `3*4=12` → Add back `2+12=14`
 
-> **Key:** "Go back in time" to fix operator precedence! 🎯
+> **Key:** "Go back in time" to fix operator precedence!
 
+---
 
 ### Algorithm:
 
