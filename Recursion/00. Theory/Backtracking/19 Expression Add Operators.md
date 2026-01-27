@@ -40,6 +40,23 @@ eval - prev + (prev * curr)
 
 **Example:** "2+3*4" when we reach '*4', undo the '+3', then add '3*4'
 
+
+### Why Subtract Then Add?
+
+**Problem:** `"2+3*4"` should be `2+(3×4)=14`, not `(2+3)×4=20`
+
+**Solution:** Undo previous operation, then apply multiplication.
+
+| Before | `currentResult=5`, `previousOperand=3`, `operandValue=4` |
+|--------|----------------------------------------------------------|
+| Formula | `newResult = currentResult - previousOperand + (previousOperand * operandValue)` |
+| Calculation | `5 - 3 + (3*4) = 2 + 12 = 14 ✓` |
+
+**Steps:** Undo `+3` → Multiply `3*4=12` → Add back `2+12=14`
+
+> **Key:** "Go back in time" to fix operator precedence! 🎯
+
+
 ### Algorithm:
 
 1. DFS with backtracking through all positions in num
