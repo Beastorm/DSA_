@@ -1,0 +1,224 @@
+## LCA in Binary Search Tree
+
+**Problem Statement:**   
+Given a Binary Search Tree (BST) and two nodes `p` and `q`, find their Lowest Common Ancestor (LCA). The LCA is defined as the lowest node in the tree that has both `p` and `q` as descendants (a node is allowed to be a descendant of itself).
+
+---
+
+>### Examples:
+
+**Example 1:**
+- **Input:** `root = [6, 2, 8, 0, 4, 7, 9, null, null, 3, 5]`, `p = 2`, `q = 8`
+- **Output:** `6`
+```
+           6
+          / \
+         2   8
+        / \ / \
+       0  4 7  9
+         / \
+        3   5
+
+  p = 2, q = 8
+  2 < 6 and 8 > 6 → they lie on opposite sides
+  LCA = 6 ✓
+```
+
+**Example 2:**
+- **Input:** `root = [6, 2, 8, 0, 4, 7, 9, null, null, 3, 5]`, `p = 2`, `q = 4`
+- **Output:** `2`
+```
+           6
+          / \
+         2   8
+        / \ / \
+       0  4 7  9
+         / \
+        3   5
+
+  p = 2, q = 4
+  Both 2 and 4 are ≤ 6 → go LEFT
+  At node 2: 4 > 2 → they split here
+  LCA = 2 ✓
+```
+
+**Example 3:**
+- **Input:** `root = [6, 2, 8, 0, 4, 7, 9]`, `p = 7`, `q = 9`
+- **Output:** `8`
+```
+           6
+          / \
+         2   8
+        / \ / \
+       0  4 7  9
+
+  p = 7, q = 9
+  Both 7 and 9 are > 6 → go RIGHT
+  At node 8: 7 < 8 and 9 > 8 → split here
+  LCA = 8 ✓
+```
+
+---
+
+### Key Insight:
+
+Unlike a general Binary Tree, the BST structure lets us **navigate directly** to the LCA using value comparisons — no need to explore both subtrees blindly.
+```
+  Three possible cases at any node:
+
+  Case 1: Both p and q are SMALLER → LCA is in LEFT subtree
+              node
+             /
+           LCA
+           / \
+          p   q
+
+  Case 2: Both p and q are LARGER → LCA is in RIGHT subtree
+              node
+                \
+                LCA
+                / \
+               p   q
+
+  Case 3: p and q are on OPPOSITE sides (or one equals node)
+              LCA ← current node IS the answer
+             /   \
+            p     q
+```
+
+---
+
+## Approach
+### Algorithm:
+
+- Start at the root of the BST.
+- At each node, compare both `p` and `q` values with the current node:
+  - If **both** `p` and `q` are **less than** current node → LCA lies in the **left subtree**, move left.
+  - If **both** `p` and `q` are **greater than** current node → LCA lies in the **right subtree**, move right.
+  - Otherwise → the current node is the **split point** and is the LCA.
+- Return the current node as the LCA.
+```
+  Find LCA(2, 4) in BST:
+
+         6          Both 2,4 < 6  → go LEFT
+        /
+       2            4 > 2         → they split here
+      / \
+     0   4          LCA = 2 ✓
+```
+
+---
+
+### C++ Code:
+```cpp
+#include <bits/stdc++.h>
+using namespace std;
+
+// Definition of TreeNode
+struct TreeNode {
+    int val;
+    TreeNode* left;
+    TreeNode* right;
+    TreeNode(int data) : val(data), left(nullptr), right(nullptr) {}
+};
+
+class Solution {
+public:
+    // Iterative approach using BST property
+    TreeNode* lowestCommonAncestor(TreeNode* root, TreeNode* p, TreeNode* q) {
+        // Traverse until we find the split point
+        while (root != nullptr) {
+            // Both nodes are in the left subtree
+            if (p->val < root->val && q->val < root->val) {
+                root = root->left;
+            }
+            // Both nodes are in the right subtree
+            else if (p->val > root->val && q->val > root->val) {
+                root = root->right;
+            }
+            // Split point found — current node is the LCA
+            else {
+                return root;
+            }
+        }
+        return nullptr;
+    }
+};
+
+// Driver code
+int main() {
+    TreeNode* root = new TreeNode(6);
+    root->left = new TreeNode(2);
+    root->right = new TreeNode(8);
+    root->left->left = new TreeNode(0);
+    root->left->right = new TreeNode(4);
+    root->right->left = new TreeNode(7);
+    root->right->right = new TreeNode(9);
+    root->left->right->left = new TreeNode(3);
+    root->left->right->right = new TreeNode(5);
+
+    Solution obj;
+
+    TreeNode* p = root->left;          // Node 2
+    TreeNode* q = root->left->right;   // Node 4
+
+    TreeNode* lca = obj.lowestCommonAncestor(root, p, q);
+    cout << "LCA of " << p->val << " and " << q->val
+         << " is: " << lca->val << endl;
+
+    return 0;
+}
+```
+
+---
+
+### Comparison: LCA in Binary Tree vs BST
+```
+  Binary Tree LCA              BST LCA
+  ─────────────────            ──────────────────
+  Must explore both            Use value comparisons
+  subtrees blindly             to navigate directly
+
+  Time: O(N)                   Time: O(H)
+  Space: O(H)                  Space: O(1) iterative
+
+  No shortcut possible         BST property gives
+                               clear direction
+```
+
+---
+
+### Edge Cases:
+```
+  One node is ancestor          Both nodes are the same:
+  of the other:
+         6                              6
+        / \                            / \
+       2   8                          2   8
+      / \                            / \
+     0   4   p=2, q=4               0   4   p=4, q=4
+
+  At node 2: 4 > 2 but            At node 4: 4==4
+  2 == p → LCA = 2 ✓              LCA = 4 ✓
+```
+
+---
+
+### Complexity Analysis:
+
+**Time Complexity:** O(H), where H is the height of the BST.
+- Balanced BST: O(log N)
+- Skewed BST: O(N)
+```
+  Balanced BST             Skewed BST
+       6                       1
+      / \                       \
+     2   8                       3
+    / \ / \                       \
+   0  4 7  9                       5
+                                    \
+  Steps ~ O(log N)                   7
+                                  Steps ~ O(N)
+```
+
+**Space Complexity:** O(1), the iterative solution uses only a constant amount of extra space. No recursion stack is involved.
