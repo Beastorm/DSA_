@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>maxPathSum — Binary Tree Visualizer</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2c; --panel2:#0d1626; --border:#24324d;
+    --text:#e2e8f0; --muted:#94a3b8;
+    --amber:#f59e0b; --green:#22c55e; --red:#ef4444; --sky:#38bdf8; --pink:#f472b6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 700px at 70% -10%, #16233d 0%, var(--bg) 55%);color:var(--text);
+       font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1240px;margin:0 auto;padding:22px 18px 40px;}
+  header h1{margin:0;font-size:24px;letter-spacing:.2px}
+  header .sub{margin:6px 0 0;color:var(--muted);font-size:14px;max-width:920px}
+  header code,.formula code,.note code{background:#1e293b;border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:12px;color:#fbbf24}
+  .grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(340px,1fr);gap:14px;margin-top:16px}
+  .side{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 16px;min-width:0}
+  .card-title{font-size:11.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .stats{font-weight:500;letter-spacing:0;text-transform:none;color:#7dd3fc;font-size:12px}
+  svg{width:100%;height:auto;display:block}
+  .formula{margin-top:8px;color:var(--muted);font-size:13px;text-align:center}
+
+  .phasetrack{display:flex;gap:6px;flex-wrap:wrap}
+  .phasetrack button{padding:4px 10px;font-size:12px;border-radius:8px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted)}
+  .phasetrack button.active{background:var(--amber);border-color:var(--amber);color:#1f2937}
+  .phasetrack button.done{background:#052e16;border-color:#166534;color:#86efac}
+
+  .scorebar{display:flex;align-items:center;gap:14px;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:8px 14px;margin-bottom:10px;flex-wrap:wrap}
+  .slabel{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}
+  .sval{font:800 21px ui-monospace,Menlo,Consolas,monospace;color:var(--pink)}
+  .spath{color:var(--muted);font-size:13px}
+
+  /* ---- SVG tree ---- */
+  .edge{stroke:#334155;stroke-width:2}
+  .edge.null{stroke:#3b4a63;stroke-dasharray:4 5;stroke-width:1.6}
+  .dpath{stroke:var(--pink);stroke-width:5.5;stroke-linecap:round;opacity:.85}
+  .node{fill:#1e293b;stroke:#64748b;stroke-width:2;transition:fill .2s,stroke .2s}
+  .node.path{fill:#0c4a6e;stroke:var(--sky)}
+  .node.current{fill:#7c2d12;stroke:var(--amber);stroke-width:3.5}
+  .node.returning{fill:#14532d;stroke:#86efac;stroke-width:3.5}
+  .node.best{stroke:var(--pink);stroke-width:3}
+  .nval{font-weight:700;font-size:18px;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+  .nval.pos{fill:#f1f5f9}
+  .nval.neg{fill:#fca5a5}
+  .ret{fill:#0c4a6e;stroke:var(--sky);stroke-width:1.2}
+  .ret text{fill:#bae6fd;font-size:11.5px;font-weight:600;text-anchor:middle}
+  .ph{fill:#0f172a;stroke:#475569;stroke-dasharray:3 3;stroke-width:1.5;transition:stroke .2s}
+  .ph.visited{stroke:#16a34a;fill:#052e16;stroke-dasharray:none}
+  .ph.hot{stroke:var(--amber);stroke-width:3;stroke-dasharray:none}
+  .phtxt{fill:#64748b;font-size:11px;text-anchor:middle;pointer-events:none}
+  .phtxt.rett{fill:#86efac;font-weight:700}
+  .cutc{fill:#450a0a;stroke:var(--red);stroke-width:1.5}
+  .cutt{fill:#fecaca;font-size:10.5px;font-weight:700;text-anchor:middle;pointer-events:none}
+  .aline{stroke-width:3;fill:none;stroke-dasharray:8 7;animation:flow .55s linear infinite}
+  .aline.down{stroke:var(--amber)}
+  .aline.up{stroke:var(--green)}
+  @keyframes flow{to{stroke-dashoffset:-15}}
+
+  /* ---- code ---- */
+  #code{font:12.3px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:8px 0;overflow-x:auto}
+  .cl{padding:1.5px 12px 1.5px 8px;white-space:pre}
+  .cl .ln{display:inline-block;width:20px;margin-right:12px;text-align:right;color:#475569;user-select:none}
+  .cl.hl{background:rgba(245,158,11,.16);box-shadow:inset 3px 0 0 var(--amber)}
+  .kw{color:#c084fc} .fn{color:#7dd3fc} .nu{color:#fb923c} .nm{color:#4ade80}
+
+  /* ---- stack ---- */
+  #stack{display:flex;flex-direction:column;gap:6px;max-height:265px;overflow-y:auto;padding-right:4px}
+  .empty{color:var(--muted);font-size:13px;font-style:italic;padding:6px 2px}
+  .frame{border:1px solid #334155;border-radius:10px;padding:7px 10px;background:#0f1a2e;font-size:13px}
+  .frame.mps{border-left:3px solid var(--pink)}
+  .frame.d{border-left:3px solid var(--sky)}
+  .frame.top{border-color:var(--amber);box-shadow:0 0 0 1px rgba(245,158,11,.25)}
+  .frame.fret{border-color:var(--green)}
+  .ftitle{font:600 12.6px ui-monospace,Menlo,Consolas,monospace;color:#cbd5e1}
+  .toplbl{color:var(--amber);font-size:10.5px;font-family:system-ui;letter-spacing:.04em}
+  .fchips{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center}
+  .chip{font:600 11.5px ui-monospace,Menlo,monospace;background:#1e293b;border:1px solid #334155;color:#64748b;border-radius:6px;padding:2px 8px}
+  .chip.on{color:#a7f3d0;border-color:#14532d;background:#052e16}
+  .chip.cut{color:#fecaca;border-color:#7f1d1d;background:#450a0a}
+  .chip.live{color:#fbcfe8;border-color:var(--pink);background:#4a044e}
+  .chip.best{color:#fbcfe8;border-color:var(--pink);background:#4a044e}
+  .res{font:700 11.5px ui-monospace,Menlo,monospace;border-radius:6px;padding:2px 8px;color:#bbf7d0;background:#14532d;border:1px solid #166534}
+
+  /* ---- message + controls ---- */
+  .msg-card{margin-top:14px;font-size:15px;min-height:46px;display:flex;align-items:center;gap:10px}
+  .msg-card::before{content:"💬";font-size:18px}
+  .controls{margin-top:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  .btns{display:flex;gap:8px}
+  button{background:#1e293b;color:var(--text);border:1px solid #334155;border-radius:10px;padding:8px 13px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
+  button:hover{background:#273549;border-color:#4a5c7a}
+  #bPlay{background:var(--amber);border-color:var(--amber);color:#1f2937;min-width:104px}
+  #bPlay:hover{background:#fbbf24}
+  #scrub{flex:1;min-width:200px;accent-color:var(--amber);cursor:pointer}
+  .meta{display:flex;align-items:center;gap:14px;color:var(--muted);font-size:12.5px;white-space:nowrap}
+  .spd{display:flex;align-items:center;gap:6px}
+  .spd input{accent-color:var(--amber);width:90px;cursor:pointer}
+
+  /* ---- terminal + legend ---- */
+  #term{margin:0;font:13px/1.7 ui-monospace,Menlo,Consolas,monospace;background:#020617;border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:#86efac}
+  .tc{color:#7dd3fc}
+  #twait{color:#64748b}
+  .hidden{display:none}
+  .legend{margin-top:14px;display:flex;flex-wrap:wrap;gap:16px;color:var(--muted);font-size:12.5px;align-items:center}
+  .legend i{display:inline-block;vertical-align:-2px;margin-right:6px}
+  .dot{width:12px;height:12px;border-radius:50%}
+  .dot.cur{background:#7c2d12;border:2.5px solid var(--amber)}
+  .dot.path{background:#0c4a6e;border:2px solid var(--sky)}
+  .dot.nul{background:#0f172a;border:2px dashed #64748b}
+  .sq{width:11px;height:11px;border-radius:3px}
+  .sq.h{background:#0c4a6e;border:1.5px solid var(--sky)}
+  .sq.cut{background:#450a0a;border:1.5px solid var(--red)}
+  .lnDown{width:26px;height:0;border-top:3px dashed var(--amber)}
+  .lnUp{width:26px;height:0;border-top:3px dashed var(--green)}
+  .lnBest{width:26px;height:0;border-top:5px solid var(--pink);border-radius:3px}
+  .note{margin-top:10px;color:var(--muted);font-size:12.5px}
+  @media(max-width:960px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>💎 Maximum Path Sum — Single-Pass DFS Visualizer</h1>
+    <p class="sub">One guided flow, two parts. <code>dfs()</code> does a post-order sweep: each node computes the best <b>one-sided</b> path sum to return upward, while <code>maxSum</code> (passed <b>by reference</b>) considers the node as a <b>turning point</b> using <i>both</i> arms.
+       Negative arms get clamped to 0 — watch for the ✂️ marks. <b>Part 1</b> is the exact tree from <code>main()</code>, <b>Part 2</b> adds negative nodes to show the clamps in action. Just press ▶ Play.</p>
+  </header>
+
+  <div class="grid">
+    <section class="card">
+      <div class="card-title">
+        <span>Tree</span>
+        <span class="phasetrack" id="phasetrack"></span>
+      </div>
+      <div class="scorebar">
+        <span class="slabel">maxSum (by ref)</span>
+        <span class="sval" id="maxiVal">INT_MIN</span>
+        <span class="spath" id="maxiPath">no turning point tried yet</span>
+      </div>
+      <svg id="tree" aria-label="binary tree"></svg>
+      <div class="formula">at each node: <code>maxSum = max(maxSum, left + right + val)</code> · return <code>max(left, right) + val</code> · arms clamped: <code>max(0, ·)</code></div>
+    </section>
+
+    <aside class="side">
+      <section class="card">
+        <div class="card-title">Code</div>
+        <div id="code"></div>
+      </section>
+      <section class="card">
+        <div class="card-title">Call stack <span class="stats" id="stats"></span></div>
+        <div id="stack"></div>
+        <div class="note">⚠️ <code>dfs</code> returns a <b>one-sided</b> path (<code>max(left,right)+val</code>) because the path must keep climbing toward a parent — but <code>maxSum</code> may use <b>both</b> arms with the node as turning point (<code>left+right+val</code>). Arms with negative sums are clamped to 0 (✂️ = dropped edge).</div>
+      </section>
+      <section class="card">
+        <div class="card-title">Program output</div>
+        <pre id="term"><span class="tc">$ g++ maxpath.cpp -o maxpath &amp;&amp; ./maxpath</span>
+<span id="toutA" class="hidden">Maximum Path Sum: 42</span>
+<span id="tmid" class="hidden tc">$ ./maxpath --demo negatives-tree      # part 2 (demo run)</span>
+<span id="toutB" class="hidden">Maximum Path Sum: 32</span>
+<span id="twait">▊ waiting for the run to finish…</span></pre>
+      </section>
+    </aside>
+  </div>
+
+  <section class="card msg-card"><div id="msg"></div></section>
+
+  <section class="card controls">
+    <div class="btns">
+      <button id="bReset" title="Reset (Home)">⏮</button>
+      <button id="bPrev"  title="Step back (←)">⏴ Step</button>
+      <button id="bPlay"  title="Play / Pause (Space)">▶ Play</button>
+      <button id="bNext"  title="Step forward (→)">Step ⏵</button>
+      <button id="bEnd"   title="Jump to end (End)">⏭</button>
+    </div>
+    <input type="range" id="scrub" min="-1" max="1" value="-1" title="Scrub through the trace">
+    <div class="meta">
+      <span id="counter"></span>
+      <label class="spd" title="Playback speed">🐢 <input type="range" id="speed" min="1" max="10" value="6"> 🐇</label>
+    </div>
+  </section>
+
+  <div class="legend">
+    <span><i class="dot cur"></i>current call</span>
+    <span><i class="dot path"></i>on the call stack</span>
+    <span><i class="sq h"></i>one-sided sum returned ↑</span>
+    <span><i class="sq cut"></i>✂️ arm clamped to 0</span>
+    <span><i class="lnBest"></i>current best path</span>
+    <span><i class="dot nul"></i>nullptr → 0</span>
+    <span><i class="lnDown"></i>call ↓</span>
+    <span><i class="lnUp"></i>return ↑</span>
+    <span style="color:#64748b">Shortcuts: Space = play/pause · ←/→ = step · Home/End</span>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================= tree definitions (node ids are their values) ================= */
+const TREES={
+  A:{ /* exact tree from main() */
+    nodes:{'-10':{l:'9',r:'20'},'9':{l:null,r:null},'20':{l:'15',r:'7'},'15':{l:null,r:null},'7':{l:null,r:null}},
+    ids:['-10','9','20','15','7'],
+    nulls:['9L','9R','15L','15R','7L','7R'],
+    edges:[['-10','9'],['-10','20'],['9','9L'],['9','9R'],['20','15'],['20','7'],['15','15L'],['15','15R'],['7','7L'],['7','7R']],
+    pos:{'-10':[410,70],'9':[210,210],'20':[610,210],'9L':[155,350],'9R':[265,350],
+         '15':[510,350],'7':[710,350],'15L':[455,490],'15R':[565,490],'7L':[655,490],'7R':[765,490]},
+    vb:'0 0 820 560'
+  },
+  B:{ /* demo tree with negative values to show the max(0,·) clamps */
+    nodes:{'2':{l:'-5',r:'10'},'-5':{l:'-3',r:'-4'},'10':{l:'20',r:'-1'},'-3':{l:null,r:null},'-4':{l:null,r:null},'20':{l:null,r:null},'-1':{l:null,r:null}},
+    ids:['2','-5','10','-3','-4','20','-1'],
+    nulls:['-3L','-3R','-4L','-4R','20L','20R','-1L','-1R'],
+    edges:[['2','-5'],['2','10'],['-5','-3'],['-5','-4'],['10','20'],['10','-1'],
+           ['-3','-3L'],['-3','-3R'],['-4','-4L'],['-4','-4R'],['20','20L'],['20','20R'],['-1','-1L'],['-1','-1R']],
+    pos:{'2':[410,70],'-5':[210,210],'10':[610,210],'-3':[110,350],'-4':[310,350],'20':[510,350],'-1':[710,350],
+         '-3L':[55,490],'-3R':[165,490],'-4L':[255,490],'-4R':[365,490],'20L':[455,490],'20R':[565,490],'-1L':[655,490],'-1R':[765,490]},
+    vb:'0 0 820 560'
+  }
+};
+const INTMIN=-2147483648;
+const val=id=>Number(id);
+
+/* best one-sided (downward) path sum starting at id — mirrors dfs return semantics */
+function armSum(nodes,id){
+  if(id==null)return 0;
+  return val(id)+Math.max(0,Math.max(armSum(nodes,nodes[id].l),armSum(nodes,nodes[id].r)));
+}
+function armPath(nodes,id){ // only called when armSum(id) drives a positive contribution
+  if(id==null)return [];
+  const l=nodes[id].l,r=nodes[id].r,ls=armSum(nodes,l),rs=armSum(nodes,r);
+  const pick=ls>=rs?l:r; // ties prefer left
+  if(pick!=null&&armSum(nodes,pick)>0)return [String(id)].concat(armPath(nodes,pick));
+  return [String(id)];
+}
+/* full turning-point path through id, using only positive arms */
+function pathThrough(nodes,id){
+  const L=(armSum(nodes,nodes[id].l)>0)?armPath(nodes,nodes[id].l).reverse():[];
+  const R=(armSum(nodes,nodes[id].r)>0)?armPath(nodes,nodes[id].r):[];
+  return L.concat([String(id)],R);
+}
+
+/* ================= trace generation (exact order of the C++ code) ================= */
+function buildTrace(nodes,root){
+  const st=[];
+  function D(id,ph){
+    st.push({t:'d-enter',id:id,ph:ph});
+    if(id==null){ st.push({t:'d-base',ph:ph}); return 0; }
+    st.push({t:'d-left',id:id});
+    const lraw=D(nodes[id].l,id+'L');
+    st.push({t:'d-setl',id:id,v:lraw});
+    const l=Math.max(0,lraw);
+    st.push({t:'d-clampl',id:id,before:lraw,after:l});
+    st.push({t:'d-right',id:id});
+    const rraw=D(nodes[id].r,id+'R');
+    st.push({t:'d-setr',id:id,v:rraw});
+    const r=Math.max(0,rraw);
+    st.push({t:'d-clampr',id:id,before:rraw,after:r});
+    st.push({t:'d-update',id:id,l:l,r:r});
+    const ret=Math.max(l,r)+val(id);
+    st.push({t:'d-ret',id:id,ret:ret});
+    return ret;
+  }
+  st.push({t:'mps-enter'});
+  st.push({t:'mps-init'});
+  st.push({t:'mps-call'});
+  D(root,null);
+  st.push({t:'mps-ret'});
+  st.push({t:'done'});
+  return st;
+}
+
+/* ================= two-part timeline ================= */
+const ROOTS={A:'-10',B:'2'};
+const PARTS=[
+  {tree:'A', trace:buildTrace(TREES.A.nodes,ROOTS.A), short:'1 · sample tree (from main)'},
+  {tree:'B', trace:buildTrace(TREES.B.nodes,ROOTS.B), short:'2 · negatives demo tree'}
+];
+let allSteps=[];
+PARTS.forEach(function(p,i){ if(i>0)allSteps.push({t:'intro',part:i}); p.start=allSteps.length; allSteps=allSteps.concat(p.trace); p.end=allSteps.length-1; });
+const LAST=allSteps.length-1;
+function phaseState(u){
+  if(u<0)return {part:0,local:-1,intro:false};
+  if(u===PARTS[1].start-1)return {part:1,local:-1,intro:true};
+  if(u>=PARTS[1].start)return {part:1,local:u-PARTS[1].start,intro:false};
+  return {part:0,local:u-PARTS[0].start,intro:false};
+}
+function popDone(stack){while(stack.length&&stack[stack.length-1].stage==='ret')stack.pop();}
+
+/* line indices into the code panel */
+const LM={enter:0,init:1,call:2,ret:3};
+const LD={enter:7,base:7,left:8,clampl:9,right:10,clampr:11,update:12,ret:13};
+
+/* ================= replay ================= */
+function replay(trace,treeKey,u,partNo){
+  const nodes=TREES[treeKey].nodes;
+  const stack=[],returns={},cuts=new Set(),visitedNulls=new Set(),nullLbl={};
+  let msg=(treeKey==='A')
+      ?'👋 Part '+partNo+': the exact tree from main(). dfs() computes one-sided path sums and updates maxSum with each node as turning point. ▶ Play — or Step.'
+      :'👋 Part '+partNo+': a tree with NEGATIVE values — watch the max(0, ·) clamps drop losing subtrees (✂️ marks). ▶ Play — or Step.',
+      line=-1,edge=null,phHot=null,banner=false,dCalls=0,result=null,
+      maxSum=INTMIN,bestNode=null,bestPath=[];
+  for(let k=0;k<=u&&k<trace.length;k++){
+    const s=trace[k];edge=null;phHot=null;
+    const topF=()=>stack[stack.length-1];
+    if(s.t==='mps-enter'){
+      stack.push({fn:'MPS',stage:'run'});
+      line=LM.enter;msg='📞 maxPathSum(root) called';
+    }else if(s.t==='mps-init'){
+      line=LM.init;msg='🔧 int maxSum = INT_MIN — passed BY REFERENCE to every dfs() call';
+    }else if(s.t==='mps-call'){
+      line=LM.call;msg='⬇️ dfs(root, maxSum) — one post-order sweep will do it all';
+    }else if(s.t==='d-enter'){
+      dCalls++;stack.push({fn:'D',id:s.id,ph:s.ph,stage:'check',lraw:null,l:null,rraw:null,r:null});
+      line=LD.enter;
+      if(s.id==null){msg='📞 dfs(NULL, maxSum)';phHot=s.ph;}
+      else msg='📞 dfs(node '+s.id+', maxSum) — not null, so recurse left first';
+    }else if(s.t==='d-base'){
+      const f=topF();f.stage='ret';f.ret=0;
+      visitedNulls.add(s.ph);nullLbl[s.ph]='0';phHot=s.ph;line=LD.base;
+      msg='🟢 Base case: NULL → 0';
+    }else if(s.t==='d-left'){
+      const f=topF();f.stage='wl';
+      const c=nodes[f.id].l;
+      edge={a:String(f.id),b:c==null?f.id+'L':String(c),dir:'down'};
+      line=LD.left;msg='⬇️ node '+f.id+': left = dfs(left, maxSum)';
+    }else if(s.t==='d-setl'){
+      popDone(stack);
+      const f=topF();f.lraw=s.v;f.stage='gl';
+      const c=nodes[f.id].l;
+      edge={a:c==null?f.id+'L':String(c),b:String(f.id),dir:'up'};
+      line=LD.left;msg='⬆️ left = '+s.v+' for node '+f.id;
+    }else if(s.t==='d-clampl'){
+      const f=topF();f.l=s.after;
+      line=LD.clampl;
+      if(s.before<0){
+        cuts.add(f.id+'L');
+        msg='✂️ left = max(0, '+s.before+') = 0 — negative contribution DROPPED; the best path will NOT enter that left subtree';
+      }else{
+        msg='left = max(0, '+s.before+') = '+s.after+' — kept ✅';
+      }
+    }else if(s.t==='d-right'){
+      const f=topF();f.stage='wr';
+      const c=nodes[f.id].r;
+      edge={a:String(f.id),b:c==null?f.id+'R':String(c),dir:'down'};
+      line=LD.right;msg='⬇️ node '+f.id+': right = dfs(right, maxSum)';
+    }else if(s.t==='d-setr'){
+      popDone(stack);
+      const f=topF();f.rraw=s.v;f.stage='gr';
+      const c=nodes[f.id].r;
+      edge={a:c==null?f.id+'R':String(c),b:String(f.id),dir:'up'};
+      line=LD.right;msg='⬆️ right = '+s.v+' for node '+f.id;
+    }else if(s.t==='d-clampr'){
+      const f=topF();f.r=s.after;
+      line=LD.clampr;
+      if(s.before<0){
+        cuts.add(f.id+'R');
+        msg='✂️ right = max(0, '+s.before+') = 0 — negative contribution DROPPED; the best path will NOT enter that right subtree';
+      }else{
+        msg='right = max(0, '+s.before+') = '+s.after+' — kept ✅';
+      }
+    }else if(s.t==='d-update'){
+      const f=topF();f.stage='upd';
+      const cand=s.l+s.r+val(f.id);f.cand=cand;
+      const prev=maxSum;
+      line=LD.update;
+      if(cand>prev){
+        maxSum=cand;bestNode=String(f.id);bestPath=pathThrough(nodes,f.id);f.improved=true;
+        msg='🎉 node '+f.id+' as turning point: '+s.l+' + '+s.r+' + ('+f.id+') = '+cand+' → maxSum UPDATED '+((prev===INTMIN)?'from INT_MIN':'from '+prev)+' to '+cand+'!';
+      }else{
+        msg='node '+f.id+' as turning point: '+s.l+' + '+s.r+' + ('+f.id+') = '+cand+' ≤ '+prev+' → maxSum stays '+prev;
+      }
+    }else if(s.t==='d-ret'){
+      const f=topF();f.stage='ret';f.ret=s.ret;
+      returns[s.id]=s.ret;
+      const parent=stack.length>1?stack[stack.length-2]:null;
+      edge=(parent&&parent.fn==='D')?{a:String(s.id),b:String(parent.id),dir:'up'}:null;
+      line=LD.ret;msg='↩️ dfs(node '+s.id+') returns max(left, right) + ('+f.id+') = '+s.ret+' — the best ONE-SIDED sum (path must keep climbing)';
+    }else if(s.t==='mps-ret'){
+      popDone(stack);
+      const f=topF();f.stage='ret';f.res=maxSum;result=maxSum;
+      line=LM.ret;msg='✅ dfs() has returned → maxPathSum returns maxSum = '+maxSum;
+    }else if(s.t==='done'){
+      popDone(stack);banner=true;line=-1;
+      if(treeKey==='A'){
+        msg='🏁 Part '+partNo+' complete: Maximum Path Sum = '+maxSum+' — the pink path '+bestPath.join(' – ')+' with node '+bestNode+' as turning point. ONE post-order sweep: '+dCalls+' dfs calls = O(n).';
+      }else{
+        msg='🏁 All done! Part 2: Maximum Path Sum = '+maxSum+' via '+bestPath.join(' – ')+' — the ✂️ marks show every place a negative arm was clamped to 0. Recap: Part 1 → 42 (path 15 – 20 – 7) · Part 2 → '+maxSum+'. One pass each: O(n).';
+      }
+    }
+  }
+  return {stack:stack,returns:returns,cuts:cuts,visitedNulls:visitedNulls,nullLbl:nullLbl,msg:msg,line:line,edge:edge,phHot:phHot,
+          banner:banner,dCalls:dCalls,result:result,maxSum:maxSum,bestNode:bestNode,bestPath:bestPath};
+}
+
+/* ================= DOM / rendering ================= */
+if(typeof document!=='undefined'){
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('tree');
+function E(tag,attrs,parent){const el=document.createElementNS(NS,tag);for(const k in attrs)el.setAttribute(k,attrs[k]);if(parent)parent.appendChild(el);return el;}
+function marker(defs,id,color){const m=E('marker',{id:id,viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:6.5,markerHeight:6.5,orient:'auto-start-reverse'},defs);E('path',{d:'M0,0L10,5L0,10z',fill:color},m);}
+
+let nodeEls={},phEls={},aLine=null,gD=null,gC=null,renderedTree=null;
+function buildSVG(treeKey){
+  const td=TREES[treeKey];
+  svg.setAttribute('viewBox',td.vb);
+  svg.innerHTML='';
+  nodeEls={};phEls={};
+  const defs=E('defs',{},svg);
+  marker(defs,'arrDown','#f59e0b');marker(defs,'arrUp','#22c55e');
+  const gE=E('g',{},svg);
+  gD=E('g',{},svg);
+  gC=E('g',{},svg);
+  const gP=E('g',{},svg),gA=E('g',{},svg),gN=E('g',{},svg);
+  for(const [a,b] of td.edges){
+    const p1=td.pos[a],p2=td.pos[b];
+    E('line',{x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],class:'edge'+(td.nulls.indexOf(b)>=0?' null':'')},gE);
+  }
+  aLine=E('line',{class:'aline'},gA);aLine.style.display='none';
+  for(const pkey of td.nulls){
+    const p=td.pos[pkey],g=E('g',{},gP);
+    const c=E('circle',{cx:p[0],cy:p[1],r:14,class:'ph'},g);
+    const t=E('text',{x:p[0],y:p[1]+4,class:'phtxt'},g);t.textContent='∅';
+    phEls[pkey]={c:c,t:t};
+  }
+  for(const id of td.ids){
+    const p=td.pos[id],x=p[0],y=p[1],g=E('g',{},gN);
+    const c=E('circle',{cx:x,cy:y,r:26,class:'node'},g);
+    const t=E('text',{x:x,y:y,class:'nval '+(val(id)<0?'neg':'pos')},g);t.textContent=id;
+    const rb=E('g',{},g);rb.style.display='none';
+    E('rect',{x:x-30,y:y+34,width:60,height:21,rx:7,class:'ret'},rb);
+    const rt=E('text',{x:x,y:y+49},rb);
+    nodeEls[id]={c:c,rb:rb,rt:rt};
+  }
+  renderedTree=treeKey;
+}
+
+/* code panel */
+const CODE=[
+  '<span class="kw">int</span> <span class="fn">maxPathSum</span>(TreeNode* root) {',
+  '    <span class="kw">int</span> maxSum = <span class="nu">INT_MIN</span>;',
+  '    <span class="fn">dfs</span>(root, maxSum);',
+  '    <span class="kw">return</span> maxSum;',
+  '}',
+  '',
+  '<span class="kw">int</span> <span class="fn">dfs</span>(TreeNode* node, <span class="kw">int</span> &amp;maxSum) {',
+  '    <span class="kw">if</span> (!node) <span class="kw">return</span> <span class="nm">0</span>;',
+  '    <span class="kw">int</span> left = <span class="fn">dfs</span>(node-&gt;left, maxSum);',
+  '    left = <span class="fn">max</span>(<span class="nm">0</span>, left);',
+  '    <span class="kw">int</span> right = <span class="fn">dfs</span>(node-&gt;right, maxSum);',
+  '    right = <span class="fn">max</span>(<span class="nm">0</span>, right);',
+  '    maxSum = <span class="fn">max</span>(maxSum, left + right + node-&gt;val);',
+  '    <span class="kw">return</span> <span class="fn">max</span>(left, right) + node-&gt;val;',
+  '}'];
+const codeBox=document.getElementById('code');
+CODE.forEach(function(h,i){
+  const d=document.createElement('div');d.className='cl';d.id='cl'+i;
+  d.innerHTML='<span class="ln">'+(i+1)+'</span><span class="lt">'+h+'</span>';
+  codeBox.appendChild(d);
+});
+
+const msgEl=document.getElementById('msg'),stackEl=document.getElementById('stack'),
+      statsEl=document.getElementById('stats'),counterEl=document.getElementById('counter'),
+      scrub=document.getElementById('scrub'),bPlay=document.getElementById('bPlay'),
+      toutA=document.getElementById('toutA'),toutB=document.getElementById('toutB'),
+      tmid=document.getElementById('tmid'),twait=document.getElementById('twait'),
+      maxiValEl=document.getElementById('maxiVal'),maxiPathEl=document.getElementById('maxiPath');
+scrub.max=String(LAST);
+
+/* phase tracker buttons */
+const trackEl=document.getElementById('phasetrack'),trackBtns=[];
+PARTS.forEach(function(p,i){
+  const b=document.createElement('button');
+  b.textContent=p.short;
+  b.title='Jump to part '+(i+1);
+  b.onclick=function(){stopPlay();setIdx(p.start);};
+  trackEl.appendChild(b);trackBtns.push(b);
+});
+
+let idx=-1,playing=false,timer=null;
+const delay=()=>1650-Number(document.getElementById('speed').value)*155;
+
+const INTRO_MSG='🎬 Part 1 result: Maximum Path Sum = 42 — the pink path 15 – 20 – 7 with node 20 as the turning point, found in one sweep of 11 dfs calls. Now Part 2: a tree with negative nodes — watch max(0, ·) chop off losing subtrees (✂️ marks).';
+
+function render(){
+  const ps=phaseState(idx);
+  const part=PARTS[ps.part];
+  if(part.tree!==renderedTree)buildSVG(part.tree);
+  const td=TREES[part.tree];
+  let st;
+  if(ps.intro){ st=replay(part.trace,part.tree,-1,2); st.msg=INTRO_MSG; }
+  else st=replay(part.trace,part.tree,ps.local,ps.part+1);
+
+  /* best path overlay */
+  gD.innerHTML='';
+  if(st.bestPath.length>1){
+    for(let i=0;i+1<st.bestPath.length;i++){
+      const p1=td.pos[st.bestPath[i]],p2=td.pos[st.bestPath[i+1]];
+      E('line',{x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],class:'dpath'},gD);
+    }
+  }
+  /* clamped-arm marks */
+  gC.innerHTML='';
+  st.cuts.forEach(function(key){
+    const id=key.slice(0,-1),side=key.slice(-1);
+    const child=side==='L'?td.nodes[id].l:td.nodes[id].r;
+    const ck=child==null?id+side:String(child);
+    const p1=td.pos[id],p2=td.pos[ck];
+    const mx=(p1[0]+p2[0])/2,my=(p1[1]+p2[1])/2;
+    E('circle',{cx:mx,cy:my,r:11,class:'cutc'},gC);
+    const t=E('text',{x:mx,y:my+3.5,class:'cutt'},gC);t.textContent='✂';
+  });
+  /* nodes */
+  const inStack=new Set(st.stack.filter(f=>f.id!=null).map(f=>String(f.id)));
+  const top=st.stack.length?st.stack[st.stack.length-1]:null;
+  const current=(top&&top.fn==='D'&&top.id!=null&&top.stage!=='ret')?String(top.id):null;
+  const returning=(top&&top.fn==='D'&&top.stage==='ret'&&top.id!=null)?String(top.id):null;
+  for(const id of td.ids){
+    const el=nodeEls[id];let cl='node';
+    if(inStack.has(id))cl+=' path';
+    if(current===id)cl+=' current';
+    if(returning===id)cl+=' returning';
+    if(String(st.bestNode)===id&&current!==id)cl+=' best';
+    el.c.setAttribute('class',cl);
+    if(st.returns[id]!=null){el.rb.style.display='';el.rt.textContent='↑ '+st.returns[id];}
+    else el.rb.style.display='none';
+  }
+  /* null placeholders */
+  for(const pkey of td.nulls){
+    const el=phEls[pkey],vis=st.visitedNulls.has(pkey);
+    let cl='ph';if(vis)cl+=' visited';if(st.phHot===pkey)cl+=' hot';
+    el.c.setAttribute('class',cl);
+    el.t.textContent=vis?(st.nullLbl[pkey]||'0'):'∅';
+    el.t.setAttribute('class','phtxt'+(vis?' rett':''));
+  }
+  /* active edge */
+  if(st.edge){
+    const p1=td.pos[st.edge.a],p2=td.pos[st.edge.b];
+    const dx=p2[0]-p1[0],dy=p2[1]-p1[1],len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len;
+    const r1=(st.edge.a in nodeEls)?26:14,r2=(st.edge.b in nodeEls)?26:14;
+    aLine.setAttribute('x1',p1[0]+ux*(r1+2));aLine.setAttribute('y1',p1[1]+uy*(r1+2));
+    aLine.setAttribute('x2',p2[0]-ux*(r2+9));aLine.setAttribute('y2',p2[1]-uy*(r2+9));
+    aLine.setAttribute('class','aline '+(st.edge.dir==='down'?'down':'up'));
+    aLine.setAttribute('marker-end',st.edge.dir==='down'?'url(#arrDown)':'url(#arrUp)');
+    aLine.style.display='';
+  } else aLine.style.display='none';
+  /* code highlight */
+  for(let i=0;i<CODE.length;i++)document.getElementById('cl'+i).classList.toggle('hl',i===st.line);
+  /* scoreboard */
+  maxiValEl.textContent=st.maxSum===INTMIN?'INT_MIN':String(st.maxSum);
+  maxiPathEl.textContent=st.bestPath.length
+    ?('best path: '+st.bestPath.join(' – ')+'  (sum '+st.maxSum+', turning point '+st.bestNode+')')
+    :'no turning point tried yet';
+  /* stack */
+  stackEl.innerHTML='';
+  if(!st.stack.length){
+    stackEl.innerHTML='<div class="empty">'+(st.banner?'all frames returned — the stack is empty again':'the stack is empty — nothing running yet')+'</div>';
+  }
+  st.stack.forEach(function(f,i){
+    const d=document.createElement('div');
+    const isTop=i===st.stack.length-1;
+    d.className='frame '+(f.fn==='MPS'?'mps':'d')+(isTop?' top':'')+(f.stage==='ret'?' fret':'');
+    let chips='';
+    if(f.fn==='MPS'){
+      chips=f.stage==='ret'
+        ?'<span class="res">returns maxSum = '+f.res+'</span>'
+        :'<span class="chip live">maxSum = '+(st.maxSum===INTMIN?'INT_MIN':st.maxSum)+' (int&amp;)</span>';
+    }else{
+      const lchip=f.l!=null?(f.lraw<0?'<span class="chip cut">left '+f.lraw+'→0 ✂</span>':'<span class="chip on">left = '+f.l+'</span>')
+                 :(f.lraw!=null?'<span class="chip">left = '+f.lraw+'</span>':'<span class="chip">left = ?</span>');
+      const rchip=f.r!=null?(f.rraw<0?'<span class="chip cut">right '+f.rraw+'→0 ✂</span>':'<span class="chip on">right = '+f.r+'</span>')
+                 :(f.rraw!=null?'<span class="chip">right = '+f.rraw+'</span>':'<span class="chip">right = ?</span>');
+      chips=lchip+rchip;
+      if(f.cand!=null)chips+='<span class="chip'+(f.improved?' best':'')+'">'+f.l+'+'+f.r+'+('+f.id+') = '+f.cand+(f.improved?' ★':'')+'</span>';
+      if(f.stage==='ret')chips+='<span class="res">returns '+f.ret+'</span>';
+    }
+    const icon=f.fn==='MPS'?'💎':'🧭';
+    const title=f.fn==='MPS'?'maxPathSum(root)':(f.id!=null?'dfs(node '+f.id+', maxSum)':'dfs(NULL, maxSum)');
+    d.innerHTML='<div class="ftitle">'+icon+' '+title+(isTop?' <span class="toplbl">◂ top</span>':'')+'</div>'+
+                (chips?'<div class="fchips">'+chips+'</div>':'');
+    stackEl.appendChild(d);
+  });
+  /* phase tracker */
+  trackBtns.forEach(function(b,i){
+    const done=idx>=PARTS[i].end, active=(ps.part===i);
+    b.className=done?'done':(active?'active':'');
+    b.textContent=PARTS[i].short+(done?' → '+PARTS[i].result:'');
+  });
+  /* text bits */
+  msgEl.textContent=st.msg;
+  statsEl.textContent='dfs calls: '+st.dCalls+' · maxSum: '+(st.maxSum===INTMIN?'INT_MIN':st.maxSum);
+  counterEl.textContent='Step '+(idx+1)+' / '+allSteps.length+' · part '+(ps.part+1)+'/2';
+  scrub.value=String(idx);
+  bPlay.textContent=playing?'⏸ Pause':'▶ Play';
+  toutA.classList.toggle('hidden',idx<PARTS[0].end);
+  tmid.classList.toggle('hidden',idx<PARTS[1].start-1);
+  toutB.classList.toggle('hidden',idx<LAST);
+  twait.classList.toggle('hidden',idx>=PARTS[0].end);
+}
+
+/* ================= controls ================= */
+function setIdx(v){idx=Math.max(-1,Math.min(LAST,v));render();}
+function stopPlay(){if(playing){playing=false;clearTimeout(timer);render();}}
+function play(){if(idx>=LAST)setIdx(-1);playing=true;render();timer=setTimeout(tick,delay());}
+function tick(){if(!playing)return;if(idx>=LAST){stopPlay();return;}setIdx(idx+1);timer=setTimeout(tick,delay());}
+bPlay.onclick=function(){playing?stopPlay():play();};
+document.getElementById('bReset').onclick=function(){stopPlay();setIdx(-1);};
+document.getElementById('bPrev').onclick=function(){stopPlay();setIdx(idx-1);};
+document.getElementById('bNext').onclick=function(){stopPlay();setIdx(idx+1);};
+document.getElementById('bEnd').onclick=function(){stopPlay();setIdx(LAST);};
+scrub.addEventListener('input',function(){stopPlay();setIdx(Number(scrub.value));});
+document.getElementById('speed').addEventListener('input',function(){
+  if(playing){clearTimeout(timer);timer=setTimeout(tick,delay());}
+});
+document.addEventListener('keydown',function(e){
+  if(e.code==='Space'){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='ArrowRight'){e.preventDefault();stopPlay();setIdx(idx+1);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();stopPlay();setIdx(idx-1);}
+  else if(e.key==='Home'){stopPlay();setIdx(-1);}
+  else if(e.key==='End'){stopPlay();setIdx(LAST);}
+});
+render();
+}
+</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a287310cef27bdd5',t:'MTc4NjI4MzAyNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f"}' crossorigin="anonymous"></script>
+</body>
+</html>

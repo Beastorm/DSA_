@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>maxDepth — Binary Tree Recursion Visualizer</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2c; --panel2:#0d1626; --border:#24324d;
+    --text:#e2e8f0; --muted:#94a3b8;
+    --amber:#f59e0b; --green:#22c55e; --sky:#38bdf8; --purple:#c084fc;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 700px at 70% -10%, #16233d 0%, var(--bg) 55%);color:var(--text);
+       font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1220px;margin:0 auto;padding:22px 18px 40px;}
+  header h1{margin:0;font-size:24px;letter-spacing:.2px}
+  header .sub{margin:6px 0 0;color:var(--muted);font-size:14px}
+  header code, .formula code{background:#1e293b;border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:12.5px;color:#fbbf24}
+  .grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(330px,1fr);gap:14px;margin-top:16px}
+  .side{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 16px;min-width:0}
+  .card-title{font-size:11.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .stats{font-weight:500;letter-spacing:0;text-transform:none;color:#7dd3fc;font-size:12px}
+  svg{width:100%;height:auto;display:block}
+  .formula{margin-top:8px;color:var(--muted);font-size:13px;text-align:center}
+
+  /* ---- SVG tree ---- */
+  .edge{stroke:#334155;stroke-width:2}
+  .edge.null{stroke:#3b4a63;stroke-dasharray:4 5;stroke-width:1.6}
+  .node{fill:#1e293b;stroke:#64748b;stroke-width:2;transition:fill .2s,stroke .2s}
+  .node.path{fill:#0c4a6e;stroke:var(--sky)}
+  .node.current{fill:#7c2d12;stroke:var(--amber);stroke-width:3.5}
+  .node.done{fill:#052e16;stroke:var(--green)}
+  .node.path.done{fill:#064e3b;stroke:var(--green)}
+  .node.returning{fill:#14532d;stroke:#86efac;stroke-width:3.5}
+  .nval{fill:#f1f5f9;font-weight:700;font-size:19px;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+  .badge rect{fill:#14532d;stroke:var(--green);stroke-width:1.2}
+  .badge text{fill:#bbf7d0;font-size:11.5px;font-weight:600;text-anchor:middle}
+  .ph{fill:#0f172a;stroke:#475569;stroke-dasharray:3 3;stroke-width:1.5;transition:stroke .2s}
+  .ph.visited{stroke:#16a34a;fill:#052e16;stroke-dasharray:none}
+  .ph.hot{stroke:var(--amber);stroke-width:3;stroke-dasharray:none}
+  .phtxt{fill:#64748b;font-size:11px;text-anchor:middle;pointer-events:none}
+  .phtxt.ret0{fill:#86efac;font-weight:700}
+  .aline{stroke-width:3;fill:none;stroke-dasharray:8 7;animation:flow .55s linear infinite}
+  .aline.down{stroke:var(--amber)}
+  .aline.up{stroke:var(--green)}
+  @keyframes flow{to{stroke-dashoffset:-15}}
+
+  /* ---- code ---- */
+  #code{font:12.8px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:8px 0;overflow-x:auto}
+  .cl{padding:1.5px 12px 1.5px 8px;white-space:pre}
+  .cl .ln{display:inline-block;width:20px;margin-right:12px;text-align:right;color:#475569;user-select:none}
+  .cl.hl{background:rgba(245,158,11,.16);box-shadow:inset 3px 0 0 var(--amber)}
+  .kw{color:var(--purple)} .fn{color:#7dd3fc} .nu{color:#fb923c} .nm{color:#4ade80}
+
+  /* ---- stack ---- */
+  #stack{display:flex;flex-direction:column;gap:6px;max-height:250px;overflow-y:auto;padding-right:4px}
+  .empty{color:var(--muted);font-size:13px;font-style:italic;padding:6px 2px}
+  .frame{border:1px solid #334155;border-radius:10px;padding:7px 10px;background:#0f1a2e;font-size:13px}
+  .frame.top{border-color:var(--amber);box-shadow:0 0 0 1px rgba(245,158,11,.25)}
+  .frame.fret{border-color:var(--green)}
+  .ftitle{font:600 12.8px ui-monospace,Menlo,Consolas,monospace;color:#cbd5e1}
+  .toplbl{color:var(--amber);font-size:10.5px;font-family:system-ui;letter-spacing:.04em}
+  .fchips{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center}
+  .chip{font:600 11.5px ui-monospace,Menlo,monospace;background:#1e293b;border:1px solid #334155;color:#64748b;border-radius:6px;padding:2px 8px}
+  .chip.on{color:#a7f3d0;border-color:#14532d;background:#052e16}
+  .res{font:700 11.5px ui-monospace,Menlo,monospace;color:#bbf7d0;background:#14532d;border:1px solid #166534;border-radius:6px;padding:2px 8px}
+
+  /* ---- message + controls ---- */
+  .msg-card{margin-top:14px;font-size:15px;min-height:46px;display:flex;align-items:center;gap:10px}
+  .msg-card::before{content:"💬";font-size:18px}
+  .controls{margin-top:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  .btns{display:flex;gap:8px}
+  button{background:#1e293b;color:var(--text);border:1px solid #334155;border-radius:10px;padding:8px 13px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
+  button:hover{background:#273549;border-color:#4a5c7a}
+  #bPlay{background:var(--amber);border-color:var(--amber);color:#1f2937;min-width:104px}
+  #bPlay:hover{background:#fbbf24}
+  #scrub{flex:1;min-width:200px;accent-color:var(--amber);cursor:pointer}
+  .meta{display:flex;align-items:center;gap:14px;color:var(--muted);font-size:12.5px;white-space:nowrap}
+  .spd{display:flex;align-items:center;gap:6px}
+  .spd input{accent-color:var(--amber);width:90px;cursor:pointer}
+
+  /* ---- terminal + legend ---- */
+  #term{margin:0;font:13px/1.7 ui-monospace,Menlo,Consolas,monospace;background:#020617;border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:#86efac}
+  .tc{color:#7dd3fc}
+  #twait{color:#64748b}
+  .hidden{display:none}
+  .legend{margin-top:14px;display:flex;flex-wrap:wrap;gap:16px;color:var(--muted);font-size:12.5px;align-items:center}
+  .legend i{display:inline-block;vertical-align:-2px;margin-right:6px}
+  .dot{width:12px;height:12px;border-radius:50%}
+  .dot.cur{background:#7c2d12;border:2.5px solid var(--amber)}
+  .dot.path{background:#0c4a6e;border:2px solid var(--sky)}
+  .dot.done{background:#052e16;border:2px solid var(--green)}
+  .dot.nul{background:#0f172a;border:2px dashed #64748b}
+  .lnDown{width:26px;height:0;border-top:3px dashed var(--amber)}
+  .lnUp{width:26px;height:0;border-top:3px dashed var(--green)}
+
+  @media(max-width:960px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🌳 Maximum Depth of a Binary Tree — Recursion Visualizer</h1>
+    <p class="sub">Watches the C++ <code>Solution::maxDepth</code> recurse over the exact tree built in <code>main()</code> —
+       nodes 1…7, with the long right chain 5 → 6 → 7 that makes the answer <b>5</b>.</p>
+  </header>
+
+  <div class="grid">
+    <section class="card">
+      <div class="card-title">Tree</div>
+      <svg id="tree" viewBox="0 0 820 660" aria-label="binary tree"></svg>
+      <div class="formula">Recurrence: <code>depth(node) = 1 + max(depth(left), depth(right))</code> &nbsp;·&nbsp; <code>depth(NULL) = 0</code></div>
+    </section>
+
+    <aside class="side">
+      <section class="card">
+        <div class="card-title">Code</div>
+        <div id="code"></div>
+      </section>
+      <section class="card">
+        <div class="card-title">Call stack <span class="stats" id="stats"></span></div>
+        <div id="stack"></div>
+      </section>
+      <section class="card">
+        <div class="card-title">Program output</div>
+        <pre id="term"><span class="tc">$ g++ max_depth.cpp -o max_depth &amp;&amp; ./max_depth</span>
+<span id="tout" class="hidden">Maximum depth of the binary tree: 5</span><span id="twait">▊ waiting for the recursion to finish…</span></pre>
+      </section>
+    </aside>
+  </div>
+
+  <section class="card msg-card"><div id="msg"></div></section>
+
+  <section class="card controls">
+    <div class="btns">
+      <button id="bReset" title="Reset (Home)">⏮</button>
+      <button id="bPrev"  title="Step back (←)">⏴ Step</button>
+      <button id="bPlay"  title="Play / Pause (Space)">▶ Play</button>
+      <button id="bNext"  title="Step forward (→)">Step ⏵</button>
+      <button id="bEnd"   title="Jump to end (End)">⏭</button>
+    </div>
+    <input type="range" id="scrub" min="-1" max="58" value="-1" title="Scrub through the trace">
+    <div class="meta">
+      <span id="counter"></span>
+      <label class="spd" title="Playback speed">🐢 <input type="range" id="speed" min="1" max="10" value="6"> 🐇</label>
+    </div>
+  </section>
+
+  <div class="legend">
+    <span><i class="dot cur"></i>current call</span>
+    <span><i class="dot path"></i>on the call stack</span>
+    <span><i class="dot done"></i>depth computed</span>
+    <span><i class="dot nul"></i>NULL → base case returns 0</span>
+    <span><i class="lnDown"></i>recursive call going down</span>
+    <span><i class="lnUp"></i>return coming up</span>
+    <span style="color:#64748b">Shortcuts: Space = play/pause · ←/→ = step · Home/End</span>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================= data ================= */
+const NODES={1:{l:2,r:3},2:{l:4,r:5},3:{l:null,r:null},4:{l:null,r:null},5:{l:null,r:6},6:{l:null,r:7},7:{l:null,r:null}};
+const POS={
+  '1':[410,60],'2':[200,170],'3':[620,170],
+  '4':[95,280],'5':[305,280],'3L':[558,280],'3R':[682,280],
+  '4L':[32,392],'4R':[158,392],'5L':[242,392],'6':[368,392],
+  '6L':[306,504],'7':[432,504],
+  '7L':[370,612],'7R':[494,612]
+};
+const EDGES=[['1','2'],['1','3'],['2','4'],['2','5'],['3','3L'],['3','3R'],
+             ['4','4L'],['4','4R'],['5','5L'],['5','6'],['6','6L'],['6','7'],['7','7L'],['7','7R']];
+const NULLS=['3L','3R','4L','4R','5L','6L','7L','7R'];
+const NODE_IDS=['1','2','3','4','5','6','7'];
+
+/* ================= trace generation (simulates the C++ recursion) ================= */
+const steps=[];
+(function trace(id,ph){
+  steps.push({t:'enter',node:id,ph:ph});
+  if(id===null){ steps.push({t:'retnull',ph:ph}); return 0; }
+  steps.push({t:'gol',node:id});
+  const lh=trace(NODES[id].l,id+'L');
+  steps.push({t:'setl',node:id,lh:lh});
+  steps.push({t:'gor',node:id});
+  const rh=trace(NODES[id].r,id+'R');
+  steps.push({t:'setr',node:id,lh:lh,rh:rh});
+  const v=1+Math.max(lh,rh);
+  steps.push({t:'ret',node:id,lh:lh,rh:rh,v:v});
+  return v;
+})(1,null);
+steps.push({t:'done'});
+
+const LN={check:1,ret0:2,lh:4,rh:5,ret:6};
+function popDone(stack){while(stack.length&&stack[stack.length-1].stage==='ret')stack.pop();}
+
+/* replay steps[0..u] into a renderable state (replay-from-zero => perfect back-stepping) */
+function replay(u){
+  const stack=[],depth={},visited=new Set();
+  let msg='👋 Ready! This is the exact tree built in main(). Press ▶ Play — or Step — to watch maxDepth() recurse.',
+      line=-1,edge=null,phHot=null,banner=false,calls=0,rets=0;
+  for(let k=0;k<=u&&k<steps.length;k++){
+    const s=steps[k];edge=null;phHot=null;
+    if(s.t==='enter'){
+      calls++;
+      stack.push({id:s.node,ph:s.ph,stage:'check',lh:null,rh:null,res:null});
+      line=LN.check;
+      if(s.node==null){msg='📞 Call #'+calls+': maxDepth(NULL) — root == NULL is TRUE';phHot=s.ph;}
+      else msg='📞 Call #'+calls+': maxDepth(node '+s.node+') — first check: is root == NULL?';
+    }else if(s.t==='retnull'){
+      const fr=stack[stack.length-1];fr.stage='ret';fr.res=0;rets++;
+      visited.add(s.ph);phHot=s.ph;line=LN.ret0;
+      msg='🟢 Base case: a NULL child contributes depth 0 → return 0';
+    }else if(s.t==='gol'){
+      const fr=stack[stack.length-1];fr.stage='wl';
+      const c=NODES[fr.id].l;
+      edge={a:String(fr.id),b:c==null?fr.id+'L':String(c),dir:'down'};
+      line=LN.lh;msg='⬇️ node '+fr.id+' ≠ NULL → dive into its LEFT subtree (computing lh)';
+    }else if(s.t==='setl'){
+      popDone(stack);
+      const fr=stack[stack.length-1];fr.lh=s.lh;fr.stage='gl';
+      const c=NODES[fr.id].l;
+      edge={a:c==null?fr.id+'L':String(c),b:String(fr.id),dir:'up'};
+      line=LN.lh;msg='⬆️ Left subtree of node '+fr.id+' finished → lh = '+s.lh;
+    }else if(s.t==='gor'){
+      const fr=stack[stack.length-1];fr.stage='wr';
+      const c=NODES[fr.id].r;
+      edge={a:String(fr.id),b:c==null?fr.id+'R':String(c),dir:'down'};
+      line=LN.rh;msg='⬇️ Now dive into the RIGHT subtree of node '+fr.id+' (computing rh)';
+    }else if(s.t==='setr'){
+      popDone(stack);
+      const fr=stack[stack.length-1];fr.rh=s.rh;fr.stage='gr';
+      const c=NODES[fr.id].r;
+      edge={a:c==null?fr.id+'R':String(c),b:String(fr.id),dir:'up'};
+      line=LN.rh;msg='⬆️ Right subtree of node '+fr.id+' finished → rh = '+s.rh+'. Both heights known!';
+    }else if(s.t==='ret'){
+      const fr=stack[stack.length-1];fr.stage='ret';fr.res=s.v;rets++;
+      depth[s.node]=s.v;
+      const parent=stack.length>1?stack[stack.length-2]:null;
+      edge=parent?{a:String(s.node),b:String(parent.id),dir:'up'}:null;
+      line=LN.ret;msg='↩️ node '+s.node+' returns 1 + max('+s.lh+', '+s.rh+') = '+s.v;
+    }else if(s.t==='done'){
+      popDone(stack);banner=true;line=-1;
+      msg='🏁 Done! Maximum depth of the binary tree = 5 — matches the program output.';
+    }
+  }
+  return {stack:stack,depth:depth,visited:visited,msg:msg,line:line,edge:edge,phHot:phHot,banner:banner,calls:calls,rets:rets};
+}
+
+/* ================= DOM / rendering ================= */
+if(typeof document!=='undefined'){
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('tree');
+function E(tag,attrs,parent){const el=document.createElementNS(NS,tag);for(const k in attrs)el.setAttribute(k,attrs[k]);if(parent)parent.appendChild(el);return el;}
+const defs=E('defs',{},svg);
+function marker(id,color){const m=E('marker',{id:id,viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:6.5,markerHeight:6.5,orient:'auto-start-reverse'},defs);E('path',{d:'M0,0L10,5L0,10z',fill:color},m);}
+marker('arrDown','#f59e0b');marker('arrUp','#22c55e');
+
+const gE=E('g',{},svg),gP=E('g',{},svg),gA=E('g',{},svg),gN=E('g',{},svg);
+for(const [a,b] of EDGES){
+  const p1=POS[a],p2=POS[b];
+  E('line',{x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],class:'edge'+(NULLS.indexOf(b)>=0?' null':'')},gE);
+}
+const aLine=E('line',{class:'aline'},gA);aLine.style.display='none';
+const nodeEls={};
+for(const id of NODE_IDS){
+  const p=POS[id],x=p[0],y=p[1],g=E('g',{},gN);
+  const c=E('circle',{cx:x,cy:y,r:26,class:'node'},g);
+  const t=E('text',{x:x,y:y,class:'nval'},g);t.textContent=id;
+  const bg=E('g',{class:'badge'},g);bg.style.display='none';
+  E('rect',{x:x-27,y:y+34,width:54,height:21,rx:7},bg);
+  const bt=E('text',{x:x,y:y+49},bg);
+  nodeEls[id]={c:c,bg:bg,bt:bt};
+}
+const phEls={};
+for(const pkey of NULLS){
+  const p=POS[pkey],g=E('g',{},gP);
+  const c=E('circle',{cx:p[0],cy:p[1],r:14,class:'ph'},g);
+  const t=E('text',{x:p[0],y:p[1]+4,class:'phtxt'},g);t.textContent='∅';
+  phEls[pkey]={c:c,t:t};
+}
+
+/* code panel */
+const CODE=[
+  '<span class="kw">int</span> <span class="fn">maxDepth</span>(Node* root){',
+  '    <span class="kw">if</span>(root == <span class="nu">NULL</span>){',
+  '        <span class="kw">return</span> <span class="nm">0</span>;',
+  '    }',
+  '    <span class="kw">int</span> lh = <span class="fn">maxDepth</span>(root-&gt;left);',
+  '    <span class="kw">int</span> rh = <span class="fn">maxDepth</span>(root-&gt;right);',
+  '    <span class="kw">return</span> <span class="nm">1</span> + <span class="fn">max</span>(lh, rh);',
+  '}'];
+const codeBox=document.getElementById('code');
+CODE.forEach(function(h,i){
+  const d=document.createElement('div');d.className='cl';d.id='cl'+i;
+  d.innerHTML='<span class="ln">'+(i+1)+'</span><span class="lt">'+h+'</span>';
+  codeBox.appendChild(d);
+});
+
+const msgEl=document.getElementById('msg'),stackEl=document.getElementById('stack'),
+      statsEl=document.getElementById('stats'),counterEl=document.getElementById('counter'),
+      scrub=document.getElementById('scrub'),bPlay=document.getElementById('bPlay'),
+      tout=document.getElementById('tout'),twait=document.getElementById('twait');
+scrub.max=String(steps.length-1);
+
+let idx=-1,playing=false,timer=null;
+const delay=()=>1600-Number(document.getElementById('speed').value)*145;
+
+function render(){
+  const st=replay(idx);
+  /* nodes */
+  const inStack=new Set(st.stack.filter(f=>f.id!=null).map(f=>String(f.id)));
+  const top=st.stack.length?st.stack[st.stack.length-1]:null;
+  const current=(top&&top.id!=null&&top.stage!=='ret')?String(top.id):null;
+  const returning=(top&&top.stage==='ret'&&top.id!=null)?String(top.id):null;
+  for(const id of NODE_IDS){
+    const el=nodeEls[id];let cl='node';
+    if(st.depth[id]!=null)cl+=' done';
+    if(inStack.has(id))cl+=' path';
+    if(current===id)cl+=' current';
+    if(returning===id)cl+=' returning';
+    el.c.setAttribute('class',cl);
+    if(st.depth[id]!=null){el.bg.style.display='';el.bt.textContent='depth '+st.depth[id];}
+    else el.bg.style.display='none';
+  }
+  /* null placeholders */
+  for(const pkey of NULLS){
+    const el=phEls[pkey],vis=st.visited.has(pkey);
+    let cl='ph';if(vis)cl+=' visited';if(st.phHot===pkey)cl+=' hot';
+    el.c.setAttribute('class',cl);
+    el.t.textContent=vis?'0':'∅';
+    el.t.setAttribute('class','phtxt'+(vis?' ret0':''));
+  }
+  /* active edge */
+  if(st.edge){
+    const p1=POS[st.edge.a],p2=POS[st.edge.b];
+    const dx=p2[0]-p1[0],dy=p2[1]-p1[1],len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len;
+    const r1=(st.edge.a in nodeEls)?26:14,r2=(st.edge.b in nodeEls)?26:14;
+    aLine.setAttribute('x1',p1[0]+ux*(r1+2));aLine.setAttribute('y1',p1[1]+uy*(r1+2));
+    aLine.setAttribute('x2',p2[0]-ux*(r2+9));aLine.setAttribute('y2',p2[1]-uy*(r2+9));
+    aLine.setAttribute('class','aline '+(st.edge.dir==='down'?'down':'up'));
+    aLine.setAttribute('marker-end',st.edge.dir==='down'?'url(#arrDown)':'url(#arrUp)');
+    aLine.style.display='';
+  } else aLine.style.display='none';
+  /* code highlight */
+  for(let i=0;i<CODE.length;i++)document.getElementById('cl'+i).classList.toggle('hl',i===st.line);
+  /* stack */
+  stackEl.innerHTML='';
+  if(!st.stack.length){
+    stackEl.innerHTML='<div class="empty">'+(st.banner?'all frames returned — the stack is empty again':'the stack is empty — nothing running yet')+'</div>';
+  }
+  st.stack.forEach(function(f,i){
+    const d=document.createElement('div');
+    d.className='frame'+(i===st.stack.length-1?' top':'')+(f.stage==='ret'?' fret':'');
+    let chips='';
+    if(f.id!=null){
+      chips='<span class="chip'+(f.lh!=null?' on':'')+'">lh = '+(f.lh!=null?f.lh:'?')+'</span>'+
+            '<span class="chip'+(f.rh!=null?' on':'')+'">rh = '+(f.rh!=null?f.rh:'?')+'</span>';
+    }
+    const res=f.stage==='ret'?'<span class="res">returns '+f.res+'</span>':'';
+    const title=f.id!=null?('maxDepth(node '+f.id+')'):'maxDepth(NULL)';
+    const lbl=i===st.stack.length-1?' <span class="toplbl">◂ top</span>':'';
+    d.innerHTML='<div class="ftitle">'+title+lbl+'</div><div class="fchips">'+chips+res+'</div>';
+    stackEl.appendChild(d);
+  });
+  /* text bits */
+  msgEl.textContent=st.msg;
+  statsEl.textContent='calls: '+st.calls+'  ·  returns: '+st.rets;
+  counterEl.textContent='Step '+(idx+1)+' / '+steps.length;
+  scrub.value=String(idx);
+  bPlay.textContent=playing?'⏸ Pause':'▶ Play';
+  tout.classList.toggle('hidden',!st.banner);
+  twait.classList.toggle('hidden',st.banner);
+}
+
+/* ================= controls ================= */
+function setIdx(v){idx=Math.max(-1,Math.min(steps.length-1,v));render();}
+function stopPlay(){if(playing){playing=false;clearTimeout(timer);render();}}
+function play(){if(idx>=steps.length-1)setIdx(-1);playing=true;render();timer=setTimeout(tick,delay());}
+function tick(){if(!playing)return;if(idx>=steps.length-1){stopPlay();return;}setIdx(idx+1);timer=setTimeout(tick,delay());}
+document.getElementById('bPlay').onclick=function(){playing?stopPlay():play();};
+document.getElementById('bReset').onclick=function(){stopPlay();setIdx(-1);};
+document.getElementById('bPrev').onclick=function(){stopPlay();setIdx(idx-1);};
+document.getElementById('bNext').onclick=function(){stopPlay();setIdx(idx+1);};
+document.getElementById('bEnd').onclick=function(){stopPlay();setIdx(steps.length-1);};
+scrub.addEventListener('input',function(){stopPlay();setIdx(Number(scrub.value));});
+document.getElementById('speed').addEventListener('input',function(){
+  if(playing){clearTimeout(timer);timer=setTimeout(tick,delay());}
+});
+document.addEventListener('keydown',function(e){
+  if(e.code==='Space'){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='ArrowRight'){e.preventDefault();stopPlay();setIdx(idx+1);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();stopPlay();setIdx(idx-1);}
+  else if(e.key==='Home'){stopPlay();setIdx(-1);}
+  else if(e.key==='End'){stopPlay();setIdx(steps.length-1);}
+});
+render();
+}
+</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a28730dc08e1bdd5',t:'MTc4NjI4MzAxNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f"}' crossorigin="anonymous"></script>
+</body>
+</html>

@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Diameter — Brute Force vs Optimized Visualizer</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2c; --panel2:#0d1626; --border:#24324d;
+    --text:#e2e8f0; --muted:#94a3b8;
+    --amber:#f59e0b; --green:#22c55e; --red:#ef4444; --sky:#38bdf8; --pink:#f472b6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 700px at 70% -10%, #16233d 0%, var(--bg) 55%);color:var(--text);
+       font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1240px;margin:0 auto;padding:22px 18px 40px;}
+  header h1{margin:0;font-size:24px;letter-spacing:.2px}
+  header .sub{margin:6px 0 0;color:var(--muted);font-size:14px;max-width:940px}
+  header code,.formula code,.note code{background:#1e293b;border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:12px;color:#fbbf24}
+  .grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(340px,1fr);gap:14px;margin-top:16px}
+  .side{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 16px;min-width:0}
+  .card-title{font-size:11.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .stats{font-weight:500;letter-spacing:0;text-transform:none;color:#7dd3fc;font-size:12px}
+  svg{width:100%;height:auto;display:block}
+  .formula{margin-top:8px;color:var(--muted);font-size:13px;text-align:center}
+
+  .phasetrack{display:flex;gap:6px;flex-wrap:wrap}
+  .phasetrack button{padding:4px 10px;font-size:12px;border-radius:8px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted)}
+  .phasetrack button.active{background:var(--amber);border-color:var(--amber);color:#1f2937}
+  .phasetrack button.done{background:#052e16;border-color:#166534;color:#86efac}
+
+  .scorebar{display:flex;align-items:center;gap:14px;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:8px 14px;margin-bottom:10px;flex-wrap:wrap}
+  .slabel{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}
+  .sval{font:800 21px ui-monospace,Menlo,Consolas,monospace;color:var(--pink)}
+  .spath{color:var(--muted);font-size:13px}
+
+  /* ---- SVG tree ---- */
+  .edge{stroke:#334155;stroke-width:2}
+  .edge.null{stroke:#3b4a63;stroke-dasharray:4 5;stroke-width:1.6}
+  .dpath{stroke:var(--pink);stroke-width:5.5;stroke-linecap:round;opacity:.85}
+  .node{fill:#1e293b;stroke:#64748b;stroke-width:2;transition:fill .2s,stroke .2s}
+  .node.path{fill:#0c4a6e;stroke:var(--sky)}
+  .node.current{fill:#7c2d12;stroke:var(--amber);stroke-width:3.5}
+  .node.returning{fill:#14532d;stroke:#86efac;stroke-width:3.5}
+  .node.best{stroke:var(--pink);stroke-width:3}
+  .nval{fill:#f1f5f9;font-weight:700;font-size:19px;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+  .hb rect{fill:#0c4a6e;stroke:var(--sky);stroke-width:1.2}
+  .hb text{fill:#bae6fd;font-size:11.5px;font-weight:600;text-anchor:middle}
+  .via rect,.wc rect{fill:#1e293b;stroke:#475569;stroke-width:1.2}
+  .via text,.wc text{fill:#cbd5e1;font-size:11.5px;font-weight:600;text-anchor:middle}
+  .via.bestchip rect,.wc.bestchip rect{fill:#4a044e;stroke:var(--pink)}
+  .via.bestchip text,.wc.bestchip text{fill:#fbcfe8}
+  .ph{fill:#0f172a;stroke:#475569;stroke-dasharray:3 3;stroke-width:1.5;transition:stroke .2s}
+  .ph.visited{stroke:#16a34a;fill:#052e16;stroke-dasharray:none}
+  .ph.hot{stroke:var(--amber);stroke-width:3;stroke-dasharray:none}
+  .phtxt{fill:#64748b;font-size:10px;text-anchor:middle;pointer-events:none}
+  .phtxt.ret{fill:#86efac;font-weight:700}
+  .aline{stroke-width:3;fill:none;stroke-dasharray:8 7;animation:flow .55s linear infinite}
+  .aline.down{stroke:var(--amber)}
+  .aline.up{stroke:var(--green)}
+  @keyframes flow{to{stroke-dashoffset:-15}}
+
+  /* ---- code ---- */
+  #code{font:12.3px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:8px 0;overflow-x:auto}
+  .cl{padding:1.5px 12px 1.5px 8px;white-space:pre}
+  .cl .ln{display:inline-block;width:20px;margin-right:12px;text-align:right;color:#475569;user-select:none}
+  .cl.hl{background:rgba(245,158,11,.16);box-shadow:inset 3px 0 0 var(--amber)}
+  .kw{color:#c084fc} .fn{color:#7dd3fc} .nu{color:#fb923c} .nm{color:#4ade80} .cm{color:#64748b;font-style:italic}
+
+  /* ---- stack ---- */
+  #stack{display:flex;flex-direction:column;gap:6px;max-height:265px;overflow-y:auto;padding-right:4px}
+  .empty{color:var(--muted);font-size:13px;font-style:italic;padding:6px 2px}
+  .frame{border:1px solid #334155;border-radius:10px;padding:7px 10px;background:#0f1a2e;font-size:13px}
+  .frame.fd{border-left:3px solid var(--pink)}
+  .frame.gh{border-left:3px solid var(--sky)}
+  .frame.h{border-left:3px solid var(--sky)}
+  .frame.top{border-color:var(--amber);box-shadow:0 0 0 1px rgba(245,158,11,.25)}
+  .frame.fret{border-color:var(--green)}
+  .ftitle{font:600 12.6px ui-monospace,Menlo,Consolas,monospace;color:#cbd5e1}
+  .toplbl{color:var(--amber);font-size:10.5px;font-family:system-ui;letter-spacing:.04em}
+  .fchips{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center}
+  .chip{font:600 11.5px ui-monospace,Menlo,monospace;background:#1e293b;border:1px solid #334155;color:#64748b;border-radius:6px;padding:2px 8px}
+  .chip.on{color:#a7f3d0;border-color:#14532d;background:#052e16}
+  .chip.live{color:#fbcfe8;border-color:var(--pink);background:#4a044e}
+  .chip.best{color:#fbcfe8;border-color:var(--pink);background:#4a044e}
+  .res{font:700 11.5px ui-monospace,Menlo,monospace;border-radius:6px;padding:2px 8px;color:#bbf7d0;background:#14532d;border:1px solid #166534}
+
+  /* ---- message + controls ---- */
+  .msg-card{margin-top:14px;font-size:15px;min-height:46px;display:flex;align-items:center;gap:10px}
+  .msg-card::before{content:"💬";font-size:18px}
+  .controls{margin-top:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  .btns{display:flex;gap:8px}
+  button{background:#1e293b;color:var(--text);border:1px solid #334155;border-radius:10px;padding:8px 13px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
+  button:hover{background:#273549;border-color:#4a5c7a}
+  #bPlay{background:var(--amber);border-color:var(--amber);color:#1f2937;min-width:104px}
+  #bPlay:hover{background:#fbbf24}
+  #scrub{flex:1;min-width:200px;accent-color:var(--amber);cursor:pointer}
+  .meta{display:flex;align-items:center;gap:14px;color:var(--muted);font-size:12.5px;white-space:nowrap}
+  .spd{display:flex;align-items:center;gap:6px}
+  .spd input{accent-color:var(--amber);width:90px;cursor:pointer}
+
+  /* ---- terminal + legend ---- */
+  #term{margin:0;font:12.5px/1.75 ui-monospace,Menlo,Consolas,monospace;background:#020617;border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:#86efac}
+  .tc{color:#7dd3fc}
+  #twait{color:#64748b}
+  .hidden{display:none}
+  .legend{margin-top:14px;display:flex;flex-wrap:wrap;gap:16px;color:var(--muted);font-size:12.5px;align-items:center}
+  .legend i{display:inline-block;vertical-align:-2px;margin-right:6px}
+  .dot{width:12px;height:12px;border-radius:50%}
+  .dot.cur{background:#7c2d12;border:2.5px solid var(--amber)}
+  .dot.path{background:#0c4a6e;border:2px solid var(--sky)}
+  .dot.nul{background:#0f172a;border:2px dashed #64748b}
+  .sq{width:11px;height:11px;border-radius:3px}
+  .sq.h{background:#0c4a6e;border:1.5px solid var(--sky)}
+  .sq.via{background:#1e293b;border:1.5px solid #475569}
+  .sq.best{background:#4a044e;border:1.5px solid var(--pink)}
+  .lnDown{width:26px;height:0;border-top:3px dashed var(--amber)}
+  .lnUp{width:26px;height:0;border-top:3px dashed var(--green)}
+  .lnBest{width:26px;height:0;border-top:5px solid var(--pink);border-radius:3px}
+  .note{margin-top:10px;color:var(--muted);font-size:12.5px}
+  @media(max-width:960px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>📐 Diameter of a Binary Tree — Brute Force vs Optimized</h1>
+    <p class="sub">One continuous flow, four parts. Heads-up: your two <code>main()</code>s build <b>different trees</b> (5 nodes vs 7 nodes), so
+       <b>Part 1</b> runs the brute force on <i>its</i> tree and <b>Part 2</b> runs the optimized version on <i>its</i> tree — then
+       <b>Parts 3 &amp; 4</b> race both algorithms on the <b>same balanced tree</b> for a fair head-to-head. Watch the call counters. Just press ▶ Play.</p>
+  </header>
+
+  <div class="grid">
+    <section class="card">
+      <div class="card-title">
+        <span>Tree</span>
+        <span class="phasetrack" id="phasetrack"></span>
+      </div>
+      <div class="scorebar">
+        <span class="slabel" id="slabel">global maxi</span>
+        <span class="sval" id="maxiVal">0</span>
+        <span class="spath" id="maxiPath">no node processed yet</span>
+      </div>
+      <svg id="tree" aria-label="binary tree"></svg>
+      <div class="formula">diameter through a node = <code>lh + rh</code> &nbsp;·&nbsp; best over all nodes wins &nbsp;·&nbsp; <code>height(nullptr) = 0</code></div>
+    </section>
+
+    <aside class="side">
+      <section class="card">
+        <div class="card-title">Code <span class="stats" id="algoTag"></span></div>
+        <div id="code"></div>
+      </section>
+      <section class="card">
+        <div class="card-title">Call stack <span class="stats" id="stats"></span></div>
+        <div id="stack"></div>
+        <div class="note">Parts 1 &amp; 3: 📐 <code>findDiameter</code> visits every node and re-measures subtrees with 📏 <code>getHeight</code> → <b>O(n²)</b>.
+        Parts 2 &amp; 4: 🔗 <code>height(node, int&amp; diameter)</code> — one post-order pass updating the diameter <b>by reference</b> → <b>O(n)</b>.</div>
+      </section>
+      <section class="card">
+        <div class="card-title">Results log</div>
+        <pre id="term"><span class="tc">$ ./diameter — 2 algorithms × head-to-head</span>
+<span id="tl0" class="hidden"></span><span id="tl1" class="hidden"></span><span id="tl2" class="hidden"></span><span id="tl3" class="hidden"></span>
+<span id="twait">▊ waiting for the runs…</span></pre>
+      </section>
+    </aside>
+  </div>
+
+  <section class="card msg-card"><div id="msg"></div></section>
+
+  <section class="card controls">
+    <div class="btns">
+      <button id="bReset" title="Reset (Home)">⏮</button>
+      <button id="bPrev"  title="Step back (←)">⏴ Step</button>
+      <button id="bPlay"  title="Play / Pause (Space)">▶ Play</button>
+      <button id="bNext"  title="Step forward (→)">Step ⏵</button>
+      <button id="bEnd"   title="Jump to end (End)">⏭</button>
+    </div>
+    <input type="range" id="scrub" min="-1" max="1" value="-1" title="Scrub through the trace">
+    <div class="meta">
+      <span id="counter"></span>
+      <label class="spd" title="Playback speed">🐢 <input type="range" id="speed" min="1" max="10" value="6"> 🐇</label>
+    </div>
+  </section>
+
+  <div class="legend">
+    <span><i class="dot cur"></i>current call</span>
+    <span><i class="dot path"></i>on the call stack</span>
+    <span><i class="sq h"></i>height returned</span>
+    <span><i class="sq via"></i>lh+rh at that node</span>
+    <span><i class="sq best"></i>node holding the best diameter</span>
+    <span><i class="lnBest"></i>current best diameter path</span>
+    <span><i class="dot nul"></i>nullptr → base case</span>
+    <span><i class="lnDown"></i>call ↓</span>
+    <span><i class="lnUp"></i>return ↑</span>
+    <span style="color:#64748b">Shortcuts: Space · ←/→ · Home/End</span>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================= tree definitions ================= */
+const TREES={
+  S5:{ /* main() of the brute-force code */
+    nodes:{1:{l:2,r:3},2:{l:4,r:5},3:{l:null,r:null},4:{l:null,r:null},5:{l:null,r:null}},
+    ids:['1','2','3','4','5'],
+    nulls:['3L','3R','4L','4R','5L','5R'],
+    edges:[['1','2'],['1','3'],['2','4'],['2','5'],['3','3L'],['3','3R'],['4','4L'],['4','4R'],['5','5L'],['5','5R']],
+    pos:{'1':[410,70],'2':[210,210],'3':[610,210],'4':[110,350],'5':[310,350],
+         '3L':[555,350],'3R':[665,350],'4L':[55,490],'4R':[165,490],'5L':[255,490],'5R':[365,490]},
+    vb:'0 0 820 560'
+  },
+  S7:{ /* main() of the optimized code */
+    nodes:{1:{l:2,r:3},2:{l:4,r:5},3:{l:null,r:null},4:{l:null,r:null},5:{l:null,r:6},6:{l:null,r:7},7:{l:null,r:null}},
+    ids:['1','2','3','4','5','6','7'],
+    nulls:['3L','3R','4L','4R','5L','6L','7L','7R'],
+    edges:[['1','2'],['1','3'],['2','4'],['2','5'],['3','3L'],['3','3R'],['4','4L'],['4','4R'],['5','5L'],['5','6'],['6','6L'],['6','7'],['7','7L'],['7','7R']],
+    pos:{'1':[410,60],'2':[200,170],'3':[620,170],'4':[95,280],'5':[305,280],'3L':[558,280],'3R':[682,280],
+         '4L':[32,392],'4R':[158,392],'5L':[242,392],'6':[368,392],'6L':[306,504],'7':[432,504],'7L':[370,612],'7R':[494,612]},
+    vb:'0 0 820 660'
+  },
+  B:{
+    nodes:{1:{l:2,r:3},2:{l:4,r:5},3:{l:6,r:7},4:{l:null,r:null},5:{l:null,r:null},6:{l:null,r:null},7:{l:null,r:null}},
+    ids:['1','2','3','4','5','6','7'],
+    nulls:['4L','4R','5L','5R','6L','6R','7L','7R'],
+    edges:[['1','2'],['1','3'],['2','4'],['2','5'],['3','6'],['3','7'],['4','4L'],['4','4R'],['5','5L'],['5','5R'],['6','6L'],['6','6R'],['7','7L'],['7','7R']],
+    pos:{'1':[410,70],'2':[210,210],'3':[610,210],'4':[110,350],'5':[310,350],'6':[510,350],'7':[710,350],
+         '4L':[55,490],'4R':[165,490],'5L':[255,490],'5R':[365,490],'6L':[455,490],'6R':[565,490],'7L':[655,490],'7R':[765,490]},
+    vb:'0 0 820 560'
+  }
+};
+
+/* longest downward chain from id (ties prefer left) */
+function deepest(nodes,id){
+  if(id==null)return [];
+  const l=deepest(nodes,nodes[id].l),r=deepest(nodes,nodes[id].r);
+  return [String(id)].concat(l.length>=r.length?l:r);
+}
+function pathThrough(nodes,id){
+  const L=deepest(nodes,nodes[id].l).reverse(),R=deepest(nodes,nodes[id].r);
+  return L.concat([String(id)],R);
+}
+
+/* ================= trace: BRUTE FORCE  findDiameter + getHeight (global maxi) ================= */
+function buildTraceBF(nodes){
+  const st=[];
+  function GH(id,ph){
+    st.push({t:'gh-enter',id:id,ph:ph});
+    if(id==null){ st.push({t:'gh-base',ph:ph}); return 0; }
+    st.push({t:'gh-left',id:id});
+    const lh=GH(nodes[id].l,id+'L');
+    st.push({t:'gh-setl',id:id,v:lh});
+    st.push({t:'gh-right',id:id});
+    const rh=GH(nodes[id].r,id+'R');
+    st.push({t:'gh-setr',id:id,v:rh});
+    const v=1+Math.max(lh,rh);
+    st.push({t:'gh-ret',id:id,lh:lh,rh:rh,v:v});
+    return v;
+  }
+  function FD(id,ph){
+    st.push({t:'fd-enter',id:id,ph:ph});
+    if(id==null){ st.push({t:'fd-base',ph:ph}); return; }
+    st.push({t:'fd-getleft',id:id});
+    const lh=GH(nodes[id].l,id+'L');
+    st.push({t:'fd-gotleft',id:id,lh:lh});
+    st.push({t:'fd-getright',id:id});
+    const rh=GH(nodes[id].r,id+'R');
+    st.push({t:'fd-gotright',id:id,rh:rh});
+    st.push({t:'fd-update',id:id,lh:lh,rh:rh});
+    st.push({t:'fd-rec-left',id:id});
+    FD(nodes[id].l,id+'L');
+    st.push({t:'fd-back-l',id:id});
+    st.push({t:'fd-rec-right',id:id});
+    FD(nodes[id].r,id+'R');
+    st.push({t:'fd-ret',id:id});
+  }
+  st.push({t:'init'});
+  FD('1',null);
+  st.push({t:'done'});
+  return st;
+}
+
+/* ================= trace: OPTIMIZED  height(node, int& diameter) ================= */
+function buildTraceOPT(nodes){
+  const st=[];
+  function H(id,ph){
+    st.push({t:'h-enter',id:id,ph:ph});
+    if(id==null){ st.push({t:'h-base',ph:ph}); return 0; }
+    st.push({t:'h-left',id:id});
+    const lh=H(nodes[id].l,id+'L');
+    st.push({t:'h-setl',id:id,v:lh});
+    st.push({t:'h-right',id:id});
+    const rh=H(nodes[id].r,id+'R');
+    st.push({t:'h-setr',id:id,v:rh});
+    st.push({t:'h-update',id:id,lh:lh,rh:rh});
+    const v=1+Math.max(lh,rh);
+    st.push({t:'h-ret',id:id,lh:lh,rh:rh,v:v});
+    return v;
+  }
+  st.push({t:'dob-enter'});
+  st.push({t:'dob-init'});
+  st.push({t:'dob-call'});
+  H('1',null);
+  st.push({t:'dob-ret'});
+  st.push({t:'done'});
+  return st;
+}
+
+/* ================= four-part timeline ================= */
+const PARTS=[
+  {algo:'BF', tree:'S5', no:1, short:'1 · O(n²) · main 5-node', trace:buildTraceBF(TREES.S5.nodes)},
+  {algo:'OPT',tree:'S7', no:2, short:'2 · O(n) · main 7-node',  trace:buildTraceOPT(TREES.S7.nodes)},
+  {algo:'BF', tree:'B',  no:3, short:'3 · O(n²) · balanced',    trace:buildTraceBF(TREES.B.nodes)},
+  {algo:'OPT',tree:'B',  no:4, short:'4 · O(n) · balanced',     trace:buildTraceOPT(TREES.B.nodes)}
+];
+let allSteps=[];
+PARTS.forEach(function(p,i){ if(i>0)allSteps.push({t:'intro',part:i}); p.start=allSteps.length; allSteps=allSteps.concat(p.trace); p.end=allSteps.length-1; });
+const LAST=allSteps.length-1;
+function phaseState(u){
+  if(u<0)return {part:0,local:-1,intro:false};
+  for(let i=1;i<PARTS.length;i++){ if(u===PARTS[i].start-1)return {part:i,local:-1,intro:true}; }
+  for(let i=PARTS.length-1;i>=0;i--){ if(u>=PARTS[i].start)return {part:i,local:u-PARTS[i].start,intro:false}; }
+  return {part:0,local:u,intro:false};
+}
+function popDone(stack){while(stack.length&&stack[stack.length-1].stage==='ret')stack.pop();}
+
+/* line indices */
+const L_BF={ghE:1,ghB:2,ghW:4,init:7,fdE:10,fdB:11,getl:13,getr:14,update:15,recl:16,recr:17,ret:18};
+const L_OPT={enter:0,init:1,call:2,ret:3,hE:7,hB:8,left:10,right:11,update:12,retH:13};
+
+/* ================= replay: BRUTE FORCE ================= */
+function replayBF(trace,treeKey,u,partNo){
+  const nodes=TREES[treeKey].nodes;
+  const stack=[],viaMap={},visitedNulls=new Set(),nullLbl={};
+  let msg='👋 Part '+partNo+' — BRUTE FORCE (O(n²)): findDiameter visits every node, getHeight re-measures subtrees, global maxi keeps the best. ▶ Play or Step.',
+      line=-1,edge=null,phHot=null,banner=false,fdCalls=0,ghCalls=0,
+      maxi=0,bestNode=null,bestPath=[];
+  for(let k=0;k<=u&&k<trace.length;k++){
+    const s=trace[k];edge=null;phHot=null;
+    const topF=()=>stack[stack.length-1];
+    if(s.t==='init'){
+      line=L_BF.init;msg='🔧 main(): maxi = 0 (global), then findDiameter(root) is called';
+    }else if(s.t==='gh-enter'){
+      ghCalls++;stack.push({fn:'GH',id:s.id,ph:s.ph,stage:'check',lh:null,rh:null});
+      line=L_BF.ghE;
+      if(s.id==null){msg='📞 getHeight(NULL)';phHot=s.ph;}
+      else msg='📞 getHeight(node '+s.id+') — not nullptr, so measure both subtrees';
+    }else if(s.t==='gh-base'){
+      const f=topF();f.stage='ret';f.res=0;
+      visitedNulls.add(s.ph);nullLbl[s.ph]='0';phHot=s.ph;line=L_BF.ghB;
+      msg='🟢 Base case: nullptr → height 0';
+    }else if(s.t==='gh-left'){
+      const f=topF();f.stage='wl';
+      const c=nodes[f.id].l;
+      edge={a:String(f.id),b:c==null?f.id+'L':String(c),dir:'down'};
+      line=L_BF.ghW;msg='📏 getHeight(node '+f.id+'): measure LEFT subtree';
+    }else if(s.t==='gh-setl'){
+      popDone(stack);
+      const f=topF();f.lh=s.v;f.stage='gl';
+      const c=nodes[f.id].l;
+      edge={a:c==null?f.id+'L':String(c),b:String(f.id),dir:'up'};
+      line=L_BF.ghW;msg='⬆️ left height of node '+f.id+' = '+s.v;
+    }else if(s.t==='gh-right'){
+      const f=topF();f.stage='wr';
+      const c=nodes[f.id].r;
+      edge={a:String(f.id),b:c==null?f.id+'R':String(c),dir:'down'};
+      line=L_BF.ghW;msg='📏 getHeight(node '+f.id+'): measure RIGHT subtree';
+    }else if(s.t==='gh-setr'){
+      popDone(stack);
+      const f=topF();f.rh=s.v;f.stage='gr';
+      const c=nodes[f.id].r;
+      edge={a:c==null?f.id+'R':String(c),b:String(f.id),dir:'up'};
+      line=L_BF.ghW;msg='⬆️ right height of node '+f.id+' = '+s.v;
+    }else if(s.t==='gh-ret'){
+      const f=topF();f.stage='ret';f.res=s.v;
+      const parent=stack.length>1?stack[stack.length-2]:null;
+      edge=parent?{a:String(s.id),b:String(parent.id),dir:'up'}:null;
+      line=L_BF.ghW;msg='↩️ getHeight(node '+s.id+') = 1 + max('+s.lh+', '+s.rh+') = '+s.v;
+    }else if(s.t==='fd-enter'){
+      fdCalls++;stack.push({fn:'FD',id:s.id,ph:s.ph,stage:'check',lh:null,rh:null});
+      line=L_BF.fdE;
+      if(s.id==null){msg='📞 findDiameter(NULL)';phHot=s.ph;}
+      else msg='📞 findDiameter(node '+s.id+') — not nullptr → measure the diameter THROUGH this node';
+    }else if(s.t==='fd-base'){
+      const f=topF();f.stage='ret';
+      visitedNulls.add(s.ph);nullLbl[s.ph]='↩';phHot=s.ph;line=L_BF.fdB;
+      msg='↩️ nullptr → nothing to process, return';
+    }else if(s.t==='fd-getleft'){
+      const f=topF();f.stage='gl0';
+      const c=nodes[f.id].l;
+      edge={a:String(f.id),b:c==null?f.id+'L':String(c),dir:'down'};
+      line=L_BF.getl;msg='⬇️ node '+f.id+': lh = getHeight(left)';
+    }else if(s.t==='fd-gotleft'){
+      popDone(stack);
+      const f=topF();f.lh=s.lh;f.stage='gl1';
+      const c=nodes[f.id].l;
+      edge={a:c==null?f.id+'L':String(c),b:String(f.id),dir:'up'};
+      line=L_BF.getl;msg='⬆️ lh = '+s.lh+' for node '+f.id;
+    }else if(s.t==='fd-getright'){
+      const f=topF();f.stage='gr0';
+      const c=nodes[f.id].r;
+      edge={a:String(f.id),b:c==null?f.id+'R':String(c),dir:'down'};
+      line=L_BF.getr;msg='⬇️ node '+f.id+': rh = getHeight(right)';
+    }else if(s.t==='fd-gotright'){
+      popDone(stack);
+      const f=topF();f.rh=s.rh;f.stage='gr1';
+      const c=nodes[f.id].r;
+      edge={a:c==null?f.id+'R':String(c),b:String(f.id),dir:'up'};
+      line=L_BF.getr;msg='⬆️ rh = '+s.rh+' for node '+f.id;
+    }else if(s.t==='fd-update'){
+      const f=topF();f.stage='upd';
+      const sum=s.lh+s.rh;f.sum=sum;viaMap[String(s.id)]=sum;
+      line=L_BF.update;
+      if(sum>maxi){
+        maxi=sum;bestNode=String(s.id);bestPath=pathThrough(nodes,s.id);f.improved=true;
+        msg='🎉 node '+s.id+': lh + rh = '+s.lh+' + '+s.rh+' = '+sum+' → maxi UPDATED to '+sum+' — new best diameter!';
+      }else{
+        msg='node '+s.id+': lh + rh = '+s.lh+' + '+s.rh+' = '+sum+' → maxi stays '+maxi+(sum===maxi?' (tie, first one kept)':'');
+      }
+    }else if(s.t==='fd-rec-left'){
+      const f=topF();f.stage='rl';
+      const c=nodes[f.id].l;
+      edge={a:String(f.id),b:c==null?f.id+'L':String(c),dir:'down'};
+      line=L_BF.recl;msg='⬇️ recurse: findDiameter(left of '+f.id+')';
+    }else if(s.t==='fd-back-l'){
+      popDone(stack);
+      const f=topF();f.stage='bl';
+      const c=nodes[f.id].l;
+      edge={a:c==null?f.id+'L':String(c),b:String(f.id),dir:'up'};
+      line=L_BF.recr;msg='⬅️ back at node '+f.id+' — left subtree fully processed → now the right subtree';
+    }else if(s.t==='fd-rec-right'){
+      const f=topF();f.stage='rr';
+      const c=nodes[f.id].r;
+      edge={a:String(f.id),b:c==null?f.id+'R':String(c),dir:'down'};
+      line=L_BF.recr;msg='⬇️ recurse: findDiameter(right of '+f.id+')';
+    }else if(s.t==='fd-ret'){
+      popDone(stack);
+      const f=topF();f.stage='ret';
+      const parent=stack.length>1?stack[stack.length-2]:null;
+      edge=(parent&&parent.fn==='FD')?{a:String(s.id),b:String(parent.id),dir:'up'}:null;
+      line=L_BF.ret;msg='↩️ findDiameter(node '+s.id+') finished — node and both subtrees done';
+    }else if(s.t==='done'){
+      popDone(stack);banner=true;line=-1;
+      msg='🏁 Part '+partNo+' (brute force) complete: diameter = '+maxi+' — longest path '+bestPath.join(' – ')+' ('+maxi+' edges). All '+TREES[treeKey].ids.length+' nodes visited; getHeight called '+ghCalls+' times → that re-measuring is the O(n²) cost.';
+    }
+  }
+  return {stack:stack,viaMap:viaMap,visitedNulls:visitedNulls,nullLbl:nullLbl,msg:msg,line:line,edge:edge,phHot:phHot,
+          banner:banner,fdCalls:fdCalls,ghCalls:ghCalls,score:maxi,result:maxi,bestNode:bestNode,bestPath:bestPath};
+}
+
+/* ================= replay: OPTIMIZED ================= */
+function replayOPT(trace,treeKey,u,partNo){
+  const nodes=TREES[treeKey].nodes;
+  const stack=[],heights={},viaMap={},visitedNulls=new Set(),nullLbl={};
+  let msg='👋 Part '+partNo+' — OPTIMIZED (O(n)): ONE post-order sweep where height() updates diameter by reference. ▶ Play or Step.',
+      line=-1,edge=null,phHot=null,banner=false,hCalls=0,result=null,
+      diam=0,bestNode=null,bestPath=[];
+  for(let k=0;k<=u&&k<trace.length;k++){
+    const s=trace[k];edge=null;phHot=null;
+    const topF=()=>stack[stack.length-1];
+    if(s.t==='dob-enter'){
+      stack.push({fn:'DOB',stage:'run'});
+      line=L_OPT.enter;msg='📞 diameterOfBinaryTree(root) called';
+    }else if(s.t==='dob-init'){
+      line=L_OPT.init;msg='🔧 int diameter = 0 — a LOCAL variable, passed to height() BY REFERENCE (int&)';
+    }else if(s.t==='dob-call'){
+      line=L_OPT.call;msg='⬇️ height(root, diameter) — one post-order sweep will fill in everything';
+    }else if(s.t==='h-enter'){
+      hCalls++;stack.push({fn:'H',id:s.id,ph:s.ph,stage:'check',lh:null,rh:null});
+      line=L_OPT.hE;
+      if(s.id==null){msg='📞 height(NULL, diameter&)';phHot=s.ph;}
+      else msg='📞 height(node '+s.id+', diameter&) — not null, so recurse left first';
+    }else if(s.t==='h-base'){
+      const f=topF();f.stage='ret';f.res=0;
+      visitedNulls.add(s.ph);nullLbl[s.ph]='0';phHot=s.ph;line=L_OPT.hB;
+      msg='🟢 Base case: NULL → height 0';
+    }else if(s.t==='h-left'){
+      const f=topF();f.stage='wl';
+      const c=nodes[f.id].l;
+      edge={a:String(f.id),b:c==null?f.id+'L':String(c),dir:'down'};
+      line=L_OPT.left;msg='⬇️ node '+f.id+': lh = height(left, diameter&)';
+    }else if(s.t==='h-setl'){
+      popDone(stack);
+      const f=topF();f.lh=s.v;f.stage='gl';
+      const c=nodes[f.id].l;
+      edge={a:c==null?f.id+'L':String(c),b:String(f.id),dir:'up'};
+      line=L_OPT.left;msg='⬆️ lh = '+s.v+' for node '+f.id;
+    }else if(s.t==='h-right'){
+      const f=topF();f.stage='wr';
+      const c=nodes[f.id].r;
+      edge={a:String(f.id),b:c==null?f.id+'R':String(c),dir:'down'};
+      line=L_OPT.right;msg='⬇️ node '+f.id+': rh = height(right, diameter&)';
+    }else if(s.t==='h-setr'){
+      popDone(stack);
+      const f=topF();f.rh=s.v;f.stage='gr';
+      const c=nodes[f.id].r;
+      edge={a:c==null?f.id+'R':String(c),b:String(f.id),dir:'up'};
+      line=L_OPT.right;msg='⬆️ rh = '+s.v+' for node '+f.id;
+    }else if(s.t==='h-update'){
+      const f=topF();f.stage='upd';
+      const sum=s.lh+s.rh;f.sum=sum;viaMap[String(s.id)]=sum;
+      const prev=diam;
+      line=L_OPT.update;
+      if(sum>prev){
+        diam=sum;bestNode=String(s.id);bestPath=pathThrough(nodes,s.id);f.improved=true;
+        msg='🎉 node '+s.id+': diameter = max('+prev+', '+s.lh+' + '+s.rh+') = '+sum+' — new best!';
+      }else{
+        msg='node '+s.id+': diameter = max('+prev+', '+s.lh+' + '+s.rh+') = '+prev+' — no change';
+      }
+    }else if(s.t==='h-ret'){
+      const f=topF();f.stage='ret';f.res=s.v;
+      heights[s.id]=s.v;
+      const parent=stack.length>1?stack[stack.length-2]:null;
+      edge=(parent&&parent.fn==='H')?{a:String(s.id),b:String(parent.id),dir:'up'}:null;
+      line=L_OPT.retH;msg='↩️ height(node '+s.id+') = 1 + max('+s.lh+', '+s.rh+') = '+s.v;
+    }else if(s.t==='dob-ret'){
+      popDone(stack);
+      const f=topF();f.stage='ret';f.res=diam;result=diam;
+      line=L_OPT.ret;msg='✅ height() has returned → diameterOfBinaryTree returns diameter = '+diam;
+    }else if(s.t==='done'){
+      popDone(stack);banner=true;line=-1;
+      msg='🏁 Part '+partNo+' (optimized) complete: diameter = '+diam+' — path '+bestPath.join(' – ')+'. ONE post-order sweep: '+hCalls+' height() calls = O(n).';
+    }
+  }
+  return {stack:stack,heights:heights,viaMap:viaMap,visitedNulls:visitedNulls,nullLbl:nullLbl,msg:msg,line:line,edge:edge,phHot:phHot,
+          banner:banner,hCalls:hCalls,result:result,score:diam,bestNode:bestNode,bestPath:bestPath};
+}
+
+function replayPart(p,u){
+  return p.algo==='BF'?replayBF(p.trace,p.tree,u,p.no):replayOPT(p.trace,p.tree,u,p.no);
+}
+const PARTSUMS=PARTS.map(function(p){return replayPart(p,p.trace.length-1);});
+
+/* intro messages between parts */
+const INTROS=[null,
+  '🎬 Part 1 done: brute force found diameter '+PARTSUMS[0].result+' (path '+PARTSUMS[0].bestPath.join(' – ')+') with '+PARTSUMS[0].ghCalls+' getHeight calls on its 5-node tree. Heads-up: the optimized code’s main() builds a DIFFERENT (7-node) tree, so Part 2 runs on that one — the head-to-head race happens on the SAME balanced tree in Parts 3 & 4.',
+  '📊 Optimized version on its own 7-node tree: diameter '+PARTSUMS[1].result+' (path '+PARTSUMS[1].bestPath.join(' – ')+') with only '+PARTSUMS[1].hCalls+' height() calls. Now the direct race: BOTH algorithms on the same balanced tree. Part 3: brute force first.',
+  '🎬 Brute force on the balanced tree: diameter '+PARTSUMS[2].result+', but '+PARTSUMS[2].ghCalls+' getHeight calls — all that re-measuring! Now the optimized version on the SAME tree — watch the call counter.'];
+const FINAL_MSG='🏁 Complete! Head-to-head on the SAME balanced tree: brute force '+PARTSUMS[2].ghCalls+' getHeight calls vs optimized '+PARTSUMS[3].hCalls+' height() calls — same answer ('+PARTSUMS[3].result+'). Diameters found: '+PARTSUMS[0].result+' (BF main tree) · '+PARTSUMS[1].result+' (OPT main tree) · '+PARTSUMS[2].result+' + '+PARTSUMS[3].result+' (balanced). One pass wins.';
+
+/* ================= code panels ================= */
+const CODES={
+BF:[
+  '<span class="kw">int</span> <span class="fn">getHeight</span>(Node* node) {',
+  '    <span class="kw">if</span> (node == <span class="nu">nullptr</span>) {',
+  '        <span class="kw">return</span> <span class="nm">0</span>;',
+  '    }',
+  '    <span class="kw">return</span> <span class="nm">1</span> + <span class="fn">max</span>(<span class="fn">getHeight</span>(node-&gt;left), <span class="fn">getHeight</span>(node-&gt;right));',
+  '}',
+  '',
+  '<span class="kw">int</span> maxi = <span class="nm">0</span>;   <span class="cm">// global best diameter</span>',
+  '',
+  '<span class="kw">void</span> <span class="fn">findDiameter</span>(Node* node) {',
+  '    <span class="kw">if</span> (node == <span class="nu">nullptr</span>) {',
+  '        <span class="kw">return</span>;',
+  '    }',
+  '    <span class="kw">int</span> lh = <span class="fn">getHeight</span>(node-&gt;left);',
+  '    <span class="kw">int</span> rh = <span class="fn">getHeight</span>(node-&gt;right);',
+  '    maxi = <span class="fn">max</span>(maxi, lh + rh);',
+  '    <span class="fn">findDiameter</span>(node-&gt;left);',
+  '    <span class="fn">findDiameter</span>(node-&gt;right);',
+  '}'],
+OPT:[
+  '<span class="kw">int</span> <span class="fn">diameterOfBinaryTree</span>(Node* root) {',
+  '    <span class="kw">int</span> diameter = <span class="nm">0</span>;',
+  '    <span class="fn">height</span>(root, diameter);',
+  '    <span class="kw">return</span> diameter;',
+  '}',
+  '',
+  '<span class="kw">int</span> <span class="fn">height</span>(Node* node, <span class="kw">int</span>&amp; diameter) {',
+  '    <span class="kw">if</span> (!node) {',
+  '        <span class="kw">return</span> <span class="nm">0</span>;',
+  '    }',
+  '    <span class="kw">int</span> lh = <span class="fn">height</span>(node-&gt;left, diameter);',
+  '    <span class="kw">int</span> rh = <span class="fn">height</span>(node-&gt;right, diameter);',
+  '    diameter = <span class="fn">max</span>(diameter, lh + rh);',
+  '    <span class="kw">return</span> <span class="nm">1</span> + <span class="fn">max</span>(lh, rh);',
+  '}']};
+
+/* ================= DOM / rendering ================= */
+if(typeof document!=='undefined'){
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('tree');
+function E(tag,attrs,parent){const el=document.createElementNS(NS,tag);for(const k in attrs)el.setAttribute(k,attrs[k]);if(parent)parent.appendChild(el);return el;}
+function marker(defs,id,color){const m=E('marker',{id:id,viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:6.5,markerHeight:6.5,orient:'auto-start-reverse'},defs);E('path',{d:'M0,0L10,5L0,10z',fill:color},m);}
+
+let nodeEls={},phEls={},aLine=null,gD=null,renderedTree=null,renderedAlgo=null;
+function buildSVG(treeKey){
+  const td=TREES[treeKey];
+  svg.setAttribute('viewBox',td.vb);
+  svg.innerHTML='';
+  nodeEls={};phEls={};
+  const defs=E('defs',{},svg);
+  marker(defs,'arrDown','#f59e0b');marker(defs,'arrUp','#22c55e');
+  const gE=E('g',{},svg);
+  gD=E('g',{},svg);
+  const gP=E('g',{},svg),gA=E('g',{},svg),gN=E('g',{},svg);
+  for(const [a,b] of td.edges){
+    const p1=td.pos[a],p2=td.pos[b];
+    E('line',{x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],class:'edge'+(td.nulls.indexOf(b)>=0?' null':'')},gE);
+  }
+  aLine=E('line',{class:'aline'},gA);aLine.style.display='none';
+  for(const pkey of td.nulls){
+    const p=td.pos[pkey],g=E('g',{},gP);
+    const c=E('circle',{cx:p[0],cy:p[1],r:14,class:'ph'},g);
+    const t=E('text',{x:p[0],y:p[1]+4,class:'phtxt'},g);t.textContent='∅';
+    phEls[pkey]={c:c,t:t};
+  }
+  for(const id of td.ids){
+    const p=td.pos[id],x=p[0],y=p[1],g=E('g',{},gN);
+    const c=E('circle',{cx:x,cy:y,r:26,class:'node'},g);
+    const t=E('text',{x:x,y:y,class:'nval'},g);t.textContent=id;
+    const wc=E('g',{class:'wc'},g);wc.style.display='none';
+    E('rect',{x:x-33,y:y+34,width:66,height:21,rx:7},wc);
+    const wt=E('text',{x:x,y:y+49},wc);
+    const hb=E('g',{class:'hb'},g);hb.style.display='none';
+    E('rect',{x:x-44,y:y+34,width:42,height:21,rx:7},hb);
+    const ht=E('text',{x:x-23,y:y+49},hb);
+    const via=E('g',{class:'via'},g);via.style.display='none';
+    E('rect',{x:x+2,y:y+34,width:42,height:21,rx:7},via);
+    const viat=E('text',{x:x+23,y:y+49},via);
+    nodeEls[id]={c:c,wc:wc,wt:wt,hb:hb,ht:ht,via:via,viat:viat};
+  }
+  renderedTree=treeKey;
+}
+
+const codeBox=document.getElementById('code'),algoTag=document.getElementById('algoTag');
+let curCode=[];
+function buildCode(algo){
+  curCode=CODES[algo];
+  codeBox.innerHTML='';
+  curCode.forEach(function(h,i){
+    const d=document.createElement('div');d.className='cl';d.id='cl'+i;
+    d.innerHTML='<span class="ln">'+(i+1)+'</span><span class="lt">'+h+'</span>';
+    codeBox.appendChild(d);
+  });
+  renderedAlgo=algo;
+  algoTag.textContent=algo==='BF'?'📐 brute force · O(n²)':'🔗 optimized · O(n)';
+  algoTag.style.color=algo==='BF'?'#fbbf24':'#86efac';
+}
+
+/* phase tracker buttons */
+const trackEl=document.getElementById('phasetrack'),trackBtns=[];
+PARTS.forEach(function(p,i){
+  const b=document.createElement('button');
+  b.textContent=p.short+' → '+PARTSUMS[i].result;
+  b.title='Jump to part '+p.no;
+  b.onclick=function(){stopPlay();setIdx(p.start);};
+  trackEl.appendChild(b);trackBtns.push(b);
+});
+
+/* results log lines */
+const tlEls=[0,1,2,3].map(i=>document.getElementById('tl'+i));
+PARTS.forEach(function(p,i){
+  const s=PARTSUMS[i];
+  const calls=p.algo==='BF'?(s.fdCalls+' findDiameter + '+s.ghCalls+' getHeight calls'):(s.hCalls+' height calls');
+  const treeName=p.tree==='S5'?'main tree (5-node)':(p.tree==='S7'?'main tree (7-node)':'balanced tree');
+  tlEls[i].textContent='#'+p.no+'  '+(p.algo==='BF'?'O(n²) brute force':'O(n) optimized ')+' · '+treeName+'  →  The diameter of the binary tree is: '+s.result+'   ['+calls+']';
+  tlEls[i].className='tline hidden';
+});
+
+const msgEl=document.getElementById('msg'),stackEl=document.getElementById('stack'),
+      statsEl=document.getElementById('stats'),counterEl=document.getElementById('counter'),
+      scrub=document.getElementById('scrub'),bPlay=document.getElementById('bPlay'),
+      twait=document.getElementById('twait'),
+      slabelEl=document.getElementById('slabel'),maxiValEl=document.getElementById('maxiVal'),maxiPathEl=document.getElementById('maxiPath');
+scrub.max=String(LAST);
+
+let idx=-1,playing=false,timer=null;
+const delay=()=>1650-Number(document.getElementById('speed').value)*155;
+
+function render(){
+  const ps=phaseState(idx);
+  const part=PARTS[ps.part];
+  if(part.tree!==renderedTree)buildSVG(part.tree);
+  if(part.algo!==renderedAlgo)buildCode(part.algo);
+  const td=TREES[part.tree];
+  let st;
+  if(ps.intro){ st=replayPart(part,-1); st.msg=INTROS[ps.part]; }
+  else st=replayPart(part,ps.local);
+  if(idx===LAST)st.msg=FINAL_MSG;
+
+  /* best diameter path */
+  gD.innerHTML='';
+  if(st.bestPath.length>1){
+    for(let i=0;i+1<st.bestPath.length;i++){
+      const p1=td.pos[st.bestPath[i]],p2=td.pos[st.bestPath[i+1]];
+      E('line',{x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],class:'dpath'},gD);
+    }
+  }
+  /* nodes */
+  const inStack=new Set(st.stack.filter(f=>f.id!=null).map(f=>String(f.id)));
+  const top=st.stack.length?st.stack[st.stack.length-1]:null;
+  const current=(top&&top.id!=null&&top.stage!=='ret')?String(top.id):null;
+  const returning=(top&&top.stage==='ret'&&top.id!=null)?String(top.id):null;
+  for(const id of td.ids){
+    const el=nodeEls[id];let cl='node';
+    if(inStack.has(id))cl+=' path';
+    if(current===id)cl+=' current';
+    if(returning===id)cl+=' returning';
+    if(String(st.bestNode)===id&&current!==id)cl+=' best';
+    el.c.setAttribute('class',cl);
+    /* badges per algorithm */
+    if(part.algo==='BF'){
+      el.hb.style.display='none';el.via.style.display='none';
+      if(st.viaMap[id]!=null){
+        el.wc.style.display='';
+        el.wc.setAttribute('class','wc'+(String(st.bestNode)===id?' bestchip':''));
+        el.wt.textContent='lh+rh='+st.viaMap[id];
+      } else el.wc.style.display='none';
+    }else{
+      el.wc.style.display='none';
+      if(st.heights[id]!=null){el.hb.style.display='';el.ht.textContent='h='+st.heights[id];}
+      else el.hb.style.display='none';
+      if(st.viaMap[id]!=null){
+        el.via.style.display='';
+        el.via.setAttribute('class','via'+(String(st.bestNode)===id?' bestchip':''));
+        el.viat.textContent='Σ'+st.viaMap[id];
+      } else el.via.style.display='none';
+    }
+  }
+  /* null placeholders */
+  for(const pkey of td.nulls){
+    const el=phEls[pkey],vis=st.visitedNulls.has(pkey);
+    let cl='ph';if(vis)cl+=' visited';if(st.phHot===pkey)cl+=' hot';
+    el.c.setAttribute('class',cl);
+    el.t.textContent=vis?(st.nullLbl[pkey]||''):'∅';
+    el.t.setAttribute('class','phtxt'+(vis?' ret':''));
+  }
+  /* active edge */
+  if(st.edge){
+    const p1=td.pos[st.edge.a],p2=td.pos[st.edge.b];
+    const dx=p2[0]-p1[0],dy=p2[1]-p1[1],len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len;
+    const r1=(st.edge.a in nodeEls)?26:14,r2=(st.edge.b in nodeEls)?26:14;
+    aLine.setAttribute('x1',p1[0]+ux*(r1+2));aLine.setAttribute('y1',p1[1]+uy*(r1+2));
+    aLine.setAttribute('x2',p2[0]-ux*(r2+9));aLine.setAttribute('y2',p2[1]-uy*(r2+9));
+    aLine.setAttribute('class','aline '+(st.edge.dir==='down'?'down':'up'));
+    aLine.setAttribute('marker-end',st.edge.dir==='down'?'url(#arrDown)':'url(#arrUp)');
+    aLine.style.display='';
+  } else aLine.style.display='none';
+  /* code highlight */
+  for(let i=0;i<curCode.length;i++)document.getElementById('cl'+i).classList.toggle('hl',i===st.line);
+  /* scoreboard */
+  slabelEl.textContent=part.algo==='BF'?'global maxi':'diameter (by ref)';
+  maxiValEl.textContent=String(st.score!=null?st.score:0);
+  maxiPathEl.textContent=st.bestPath.length
+    ?('best path: '+st.bestPath.join(' – ')+'  ('+st.score+' edges, through node '+st.bestNode+')')
+    :'no node processed yet';
+  /* stack */
+  stackEl.innerHTML='';
+  if(!st.stack.length){
+    stackEl.innerHTML='<div class="empty">'+(st.banner?'all frames returned — the stack is empty again':'the stack is empty — nothing running yet')+'</div>';
+  }
+  st.stack.forEach(function(f,i){
+    const d=document.createElement('div');
+    const isTop=i===st.stack.length-1;
+    let cls='frame ',chips='',icon='',title='';
+    if(part.algo==='BF'){
+      cls+=(f.fn==='FD'?'fd':'gh')+(isTop?' top':'')+(f.stage==='ret'?' fret':'');
+      if(f.id!=null){
+        chips='<span class="chip'+(f.lh!=null?' on':'')+'">lh = '+(f.lh!=null?f.lh:'?')+'</span>'+
+              '<span class="chip'+(f.rh!=null?' on':'')+'">rh = '+(f.rh!=null?f.rh:'?')+'</span>';
+        if(f.fn==='FD'&&f.sum!=null)chips+='<span class="chip'+(f.improved?' best':'')+'">lh+rh = '+f.sum+(f.improved?' ★':'')+'</span>';
+        if(f.fn==='GH'&&f.stage==='ret')chips+='<span class="res">returns '+f.res+'</span>';
+      }
+      icon=f.fn==='FD'?'📐':'📏';
+      title=f.id!=null?(f.fn==='FD'?'findDiameter(node '+f.id+')':'getHeight(node '+f.id+')')
+                       :(f.fn==='FD'?'findDiameter(NULL)':'getHeight(NULL)');
+    }else{
+      if(f.fn==='DOB'){
+        cls+='fd'+(isTop?' top':'')+(f.stage==='ret'?' fret':'');
+        chips=f.stage==='ret'
+          ?'<span class="res">returns diameter = '+f.res+'</span>'
+          :'<span class="chip live">diameter = '+st.score+' (int&amp;)</span>';
+        icon='📐';title='diameterOfBinaryTree(root)';
+      }else{
+        cls+='h'+(isTop?' top':'')+(f.stage==='ret'?' fret':'');
+        chips='<span class="chip'+(f.lh!=null?' on':'')+'">lh = '+(f.lh!=null?f.lh:'?')+'</span>'+
+              '<span class="chip'+(f.rh!=null?' on':'')+'">rh = '+(f.rh!=null?f.rh:'?')+'</span>';
+        if(f.sum!=null)chips+='<span class="chip'+(f.improved?' best':'')+'">lh+rh = '+f.sum+(f.improved?' ★':'')+'</span>';
+        if(f.stage==='ret')chips+='<span class="res">returns '+f.res+'</span>';
+        icon='🔗';title=f.id!=null?'height(node '+f.id+', diameter&)':'height(NULL, diameter&)';
+      }
+    }
+    d.className=cls;
+    d.innerHTML='<div class="ftitle">'+icon+' '+title+(isTop?' <span class="toplbl">◂ top</span>':'')+'</div>'+
+                (chips?'<div class="fchips">'+chips+'</div>':'');
+    stackEl.appendChild(d);
+  });
+  /* phase tracker */
+  trackBtns.forEach(function(b,i){
+    const done=idx>=PARTS[i].end, active=(ps.part===i);
+    b.className=done?'done':(active?'active':'');
+  });
+  /* text bits */
+  msgEl.textContent=st.msg;
+  statsEl.textContent=part.algo==='BF'
+    ?('findDiameter calls: '+st.fdCalls+' · getHeight calls: '+st.ghCalls)
+    :('height() calls: '+st.hCalls);
+  counterEl.textContent='Step '+(idx+1)+' / '+allSteps.length+' · part '+part.no+'/4';
+  scrub.value=String(idx);
+  bPlay.textContent=playing?'⏸ Pause':'▶ Play';
+  PARTS.forEach(function(p,i){ tlEls[i].classList.toggle('hidden',idx<p.end); });
+  twait.classList.toggle('hidden',idx>=PARTS[0].end);
+}
+
+/* ================= controls ================= */
+function setIdx(v){idx=Math.max(-1,Math.min(LAST,v));render();}
+function stopPlay(){if(playing){playing=false;clearTimeout(timer);render();}}
+function play(){if(idx>=LAST)setIdx(-1);playing=true;render();timer=setTimeout(tick,delay());}
+function tick(){if(!playing)return;if(idx>=LAST){stopPlay();return;}setIdx(idx+1);timer=setTimeout(tick,delay());}
+bPlay.onclick=function(){playing?stopPlay():play();};
+document.getElementById('bReset').onclick=function(){stopPlay();setIdx(-1);};
+document.getElementById('bPrev').onclick=function(){stopPlay();setIdx(idx-1);};
+document.getElementById('bNext').onclick=function(){stopPlay();setIdx(idx+1);};
+document.getElementById('bEnd').onclick=function(){stopPlay();setIdx(LAST);};
+scrub.addEventListener('input',function(){stopPlay();setIdx(Number(scrub.value));});
+document.getElementById('speed').addEventListener('input',function(){
+  if(playing){clearTimeout(timer);timer=setTimeout(tick,delay());}
+});
+document.addEventListener('keydown',function(e){
+  if(e.code==='Space'){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='ArrowRight'){e.preventDefault();stopPlay();setIdx(idx+1);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();stopPlay();setIdx(idx-1);}
+  else if(e.key==='Home'){stopPlay();setIdx(-1);}
+  else if(e.key==='End'){stopPlay();setIdx(LAST);}
+});
+render();
+}
+</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a28730a93ab3bdd5',t:'MTc4NjI4MzAwOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f"}' crossorigin="anonymous"></script>
+</body>
+</html>

@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Vertical Order Traversal — BFS Visualizer</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2c; --panel2:#0d1626; --border:#24324d;
+    --text:#e2e8f0; --muted:#94a3b8;
+    --amber:#f59e0b; --green:#22c55e; --red:#ef4444; --sky:#38bdf8; --purple:#c084fc;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 700px at 70% -10%, #16233d 0%, var(--bg) 55%);color:var(--text);
+       font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1240px;margin:0 auto;padding:22px 18px 40px;}
+  header h1{margin:0;font-size:24px;letter-spacing:.2px}
+  header .sub{margin:6px 0 0;color:var(--muted);font-size:14px;max-width:920px}
+  header code,.formula code,.note code{background:#1e293b;border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:12px;color:#fbbf24}
+  .grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(340px,1fr);gap:14px;margin-top:16px}
+  .leftcol{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .side{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 16px;min-width:0}
+  .card-title{font-size:11.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .stats{font-weight:500;letter-spacing:0;text-transform:none;color:#7dd3fc;font-size:12px}
+  svg{width:100%;height:auto;display:block}
+  .formula{margin-top:8px;color:var(--muted);font-size:13px;text-align:center}
+
+  .phasetrack{display:flex;gap:6px;flex-wrap:wrap}
+  .phasetrack button{padding:4px 10px;font-size:12px;border-radius:8px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted)}
+  .phasetrack button.active{background:var(--amber);border-color:var(--amber);color:#1f2937}
+  .phasetrack button.done{background:#052e16;border-color:#166534;color:#86efac}
+
+  /* ---- SVG tree ---- */
+  .edge{stroke:#334155;stroke-width:2}
+  .node{fill:#1e293b;stroke:#64748b;stroke-width:2;transition:fill .2s,stroke .2s}
+  .node.colneg2{stroke:#ef4444}
+  .node.colneg1{stroke:#f59e0b}
+  .node.col0{stroke:#38bdf8}
+  .node.col1{stroke:#22c55e}
+  .node.col2{stroke:#c084fc}
+  .node.colx{stroke:#e879f9}
+  .node.queued{stroke:#7dd3fc;stroke-dasharray:5 4}
+  .node.current{stroke:var(--amber);stroke-width:4;stroke-dasharray:none}
+  .nval{fill:#f1f5f9;font-weight:700;font-size:18px;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+  .lanehd{fill:#94a3b8;font-size:12.5px;font-weight:700;text-anchor:middle}
+  .lanecap{fill:#64748b;font-size:12px}
+  .bval{fill:#f8fafc;font-weight:700;font-size:12.5px;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+  .aline{stroke-width:3;fill:none;stroke-dasharray:8 7;animation:flow .55s linear infinite}
+  .aline.down{stroke:var(--amber)}
+  @keyframes flow{to{stroke-dashoffset:-15}}
+
+  /* ---- code ---- */
+  #code{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:8px 0;overflow-x:auto}
+  .cl{padding:1.5px 12px 1.5px 8px;white-space:pre}
+  .cl .ln{display:inline-block;width:20px;margin-right:12px;text-align:right;color:#475569;user-select:none}
+  .cl.hl{background:rgba(245,158,11,.16);box-shadow:inset 3px 0 0 var(--amber)}
+  .kw{color:#c084fc} .fn{color:#7dd3fc} .nu{color:#fb923c} .nm{color:#4ade80} .cm{color:#64748b;font-style:italic}
+
+  /* ---- queue ---- */
+  #queueBox{display:flex;flex-wrap:wrap;gap:6px;min-height:34px;align-items:center}
+  .qempty{color:var(--muted);font-size:13px;font-style:italic}
+  .qitem{font:600 12.5px ui-monospace,Menlo,monospace;background:#0f1a2e;border:1px solid #334155;border-left-width:4px;border-radius:8px;padding:4px 9px;color:#e2e8f0}
+  .qfront{outline:2px solid var(--amber);outline-offset:1px}
+  .qlbl{font-size:10px;color:var(--amber);letter-spacing:.05em;margin-right:2px}
+
+  /* ---- columns map panel ---- */
+  #mapBox{display:flex;flex-direction:column;gap:7px;min-height:34px}
+  .mempty{color:var(--muted);font-size:13px;font-style:italic}
+  .mrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#0d1626;border:1px solid var(--border);border-radius:9px;padding:6px 10px}
+  .mrow.newrow{border-color:var(--green);box-shadow:0 0 0 1px rgba(34,197,94,.35)}
+  .mrow.activerow{border-color:var(--amber);box-shadow:0 0 0 1px rgba(245,158,11,.3)}
+  .mkey{font:700 12px ui-monospace,Menlo,monospace;border:1px solid;border-radius:6px;padding:2px 8px}
+  .marrow{color:var(--muted)}
+  .vec{display:flex;align-items:center;gap:5px}
+  .vec::before{content:'[';color:#64748b;font-weight:700}
+  .vec::after{content:']';color:#64748b;font-weight:700}
+  .mcell{font:600 12.5px ui-monospace,Menlo,monospace;background:#1e293b;border:1px solid #334155;border-radius:6px;padding:2px 8px;color:#e2e8f0}
+  .mcell.pop{border-color:var(--amber);color:#fde68a}
+  .mtag{font:600 11.5px ui-monospace,Menlo,monospace;color:#86efac}
+
+  /* ---- answer ---- */
+  #ansLine{font:600 13px ui-monospace,Menlo,monospace;color:#fbcfe8;background:#0d1626;border:1px solid var(--border);border-radius:8px;padding:8px 10px;min-height:36px;word-break:break-all}
+
+  /* ---- message + controls ---- */
+  .msg-card{margin-top:14px;font-size:15px;min-height:46px;display:flex;align-items:center;gap:10px}
+  .msg-card::before{content:"💬";font-size:18px}
+  .controls{margin-top:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  .btns{display:flex;gap:8px}
+  button{background:#1e293b;color:var(--text);border:1px solid #334155;border-radius:10px;padding:8px 13px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
+  button:hover{background:#273549;border-color:#4a5c7a}
+  #bPlay{background:var(--amber);border-color:var(--amber);color:#1f2937;min-width:104px}
+  #bPlay:hover{background:#fbbf24}
+  #scrub{flex:1;min-width:200px;accent-color:var(--amber);cursor:pointer}
+  .meta{display:flex;align-items:center;gap:14px;color:var(--muted);font-size:12.5px;white-space:nowrap}
+  .spd{display:flex;align-items:center;gap:6px}
+  .spd input{accent-color:var(--amber);width:90px;cursor:pointer}
+
+  /* ---- terminal + legend ---- */
+  #term{margin:8px 0 0;font:12.5px/1.7 ui-monospace,Menlo,Consolas,monospace;background:#020617;border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:#86efac}
+  .tc{color:#7dd3fc}
+  #twait{color:#64748b}
+  .hidden{display:none}
+  .legend{margin-top:14px;display:flex;flex-wrap:wrap;gap:16px;color:var(--muted);font-size:12.5px;align-items:center}
+  .legend i{display:inline-block;vertical-align:-2px;margin-right:6px}
+  .dot{width:12px;height:12px;border-radius:50%}
+  .dot.cur{background:#7c2d12;border:2.5px solid var(--amber)}
+  .dot.q{background:#1e293b;border:2px dashed #7dd3fc}
+  .dot.c0{background:#1e293b;border:2px solid var(--sky)}
+  .dot.c1{background:#1e293b;border:2px solid var(--green)}
+  .dot.cm1{background:#1e293b;border:2px solid var(--amber)}
+  .lnDown{width:26px;height:0;border-top:3px dashed var(--amber)}
+  .note{margin-top:10px;color:var(--muted);font-size:12.5px}
+  @media(max-width:960px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🏙️ Vertical Order Traversal — BFS + Column Map Visualizer</h1>
+    <p class="sub">One guided flow, two parts. A BFS assigns every node a <b>column number</b> (root = 0, left child = −1, right child = +1 relative to its parent) and drops values into a <code>map</code> that stays sorted by column.
+       Watch the <b>queue</b> work FIFO and the <b>column lanes</b> fill up in level order. <b>Part 1</b> is the exact tree from <code>main()</code>, <b>Part 2</b> a zigzag demo. Just press ▶ Play.</p>
+  </header>
+
+  <div class="grid">
+    <div class="leftcol">
+    <section class="card">
+      <div class="card-title">
+        <span>Tree &amp; column lanes</span>
+        <span class="phasetrack" id="phasetrack"></span>
+      </div>
+      <svg id="tree" aria-label="binary tree with column lanes"></svg>
+      <div class="formula">left child → <code>column − 1</code> · right child → <code>column + 1</code> · BFS order inside each lane = top-to-bottom</div>
+    </section>
+
+    <section class="card">
+      <div class="card-title">columns map <span class="stats" id="mapStats"></span></div>
+      <div id="mapBox"></div>
+      <div class="note">🗝️ <code>std::map</code> keeps its keys sorted at all times — new keys slot into position automatically, so the final loop reads the columns left-to-right for free (each insert costs O(log k)).</div>
+    </section>
+    </div>
+
+    <aside class="side">
+      <section class="card">
+        <div class="card-title">Code</div>
+        <div id="code"></div>
+      </section>
+      <section class="card">
+        <div class="card-title">BFS queue <span class="stats" id="stats"></span></div>
+        <div id="queueBox"></div>
+        <div class="note">📤 Dequeue from the <b>front</b>, 📥 enqueue children at the <b>back</b> with their column numbers. Because BFS visits level by level, each lane collects values <b>top-to-bottom</b> — something a DFS preorder would get wrong.</div>
+      </section>
+      <section class="card">
+        <div class="card-title">Output</div>
+        <div id="ansLine">answer = []</div>
+        <pre id="term"><span class="tc">$ g++ vertical.cpp -o vertical &amp;&amp; ./vertical</span>
+<span id="toutA" class="hidden">Vertical order traversal: [[4], [2, 5], [1, 10, 9, 6], [3], [11]]</span>
+<span id="tmid" class="hidden tc">$ ./vertical --demo zigzag-tree        # part 2 (demo run)</span>
+<span id="toutB" class="hidden">Vertical order traversal: [[1, 3, 5], [2, 4]]</span>
+<span id="twait">▊ waiting for the run to finish…</span></pre>
+      </section>
+    </aside>
+  </div>
+
+  <section class="card msg-card"><div id="msg"></div></section>
+
+  <section class="card controls">
+    <div class="btns">
+      <button id="bReset" title="Reset (Home)">⏮</button>
+      <button id="bPrev"  title="Step back (←)">⏴ Step</button>
+      <button id="bPlay"  title="Play / Pause (Space)">▶ Play</button>
+      <button id="bNext"  title="Step forward (→)">Step ⏵</button>
+      <button id="bEnd"   title="Jump to end (End)">⏭</button>
+    </div>
+    <input type="range" id="scrub" min="-1" max="1" value="-1" title="Scrub through the trace">
+    <div class="meta">
+      <span id="counter"></span>
+      <label class="spd" title="Playback speed">🐢 <input type="range" id="speed" min="1" max="10" value="6"> 🐇</label>
+    </div>
+  </section>
+
+  <div class="legend">
+    <span><i class="dot cur"></i>current (just dequeued)</span>
+    <span><i class="dot q"></i>waiting in queue</span>
+    <span><i class="dot cm1"></i>colored ring = assigned column</span>
+    <span><i class="lnDown"></i>child enqueued</span>
+    <span>lanes below the tree = the sorted columns map</span>
+    <span style="color:#64748b">Shortcuts: Space = play/pause · ←/→ = step · Home/End</span>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================= tree definitions (ids are node values, unique per tree) ================= */
+const TREES={
+  A:{ /* exact tree from main() */
+    nodes:{'1':{l:'2',r:'3'},'2':{l:'4',r:'10'},'3':{l:'9',r:'11'},'4':{l:null,r:'5'},'10':{l:null,r:null},
+           '9':{l:null,r:null},'11':{l:null,r:null},'5':{l:null,r:'6'},'6':{l:null,r:null}},
+    ids:['1','2','3','4','10','9','11','5','6'],
+    edges:[['1','2'],['1','3'],['2','4'],['2','10'],['3','9'],['3','11'],['4','5'],['5','6']],
+    /* every node sits exactly on its column lane; 10 and 9 share column 0 at the same
+       depth, so 9 is staggered down the lane to avoid overlapping 10 */
+    pos:{'1':[410,60],'2':[260,170],'3':[560,170],'4':[110,280],'10':[410,280],'9':[410,368],'11':[710,280],
+         '5':[260,390],'6':[410,500]},
+    vb:'0 0 820 722', labelY:16, guideTop:26, capY:572, ballTop:596, laneMax:4
+  },
+  B:{ /* zigzag demo: columns 0 and 1 revisited at alternating depths */
+    nodes:{'1':{l:null,r:'2'},'2':{l:'3',r:null},'3':{l:null,r:'4'},'4':{l:'5',r:null},'5':{l:null,r:null}},
+    ids:['1','2','3','4','5'],
+    edges:[['1','2'],['2','3'],['3','4'],['4','5']],
+    pos:{'1':[410,70],'2':[560,180],'3':[410,290],'4':[560,400],'5':[410,510]},
+    vb:'0 0 820 722', labelY:16, guideTop:26, capY:572, ballTop:596, laneMax:3
+  }
+};
+const ROOTS={A:'1',B:'1'};
+const COLPAL={'-2':'#ef4444','-1':'#f59e0b','0':'#38bdf8','1':'#22c55e','2':'#c084fc'};
+const colColor=c=>COLPAL[String(c)]||'#e879f9';
+const colClass=c=>c===-2?'colneg2':c===-1?'colneg1':c===0?'col0':c===1?'col1':c===2?'col2':'colx';
+
+/* static column of every node (for building lanes) */
+function assignColumns(nodes,root){
+  const colOf={};(function w(id,c){ if(id==null)return; colOf[id]=c; w(nodes[id].l,c-1); w(nodes[id].r,c+1); })(root,0);
+  return colOf;
+}
+
+/* ================= trace generation (exact order of the C++ BFS) ================= */
+function buildTrace(nodes,root){
+  const st=[];
+  st.push({t:'init'});
+  st.push({t:'push-root',id:root});
+  const q=[{id:root,col:0}];
+  while(q.length){
+    const it=q.shift();
+    st.push({t:'pop',id:it.id,col:it.col});
+    st.push({t:'record',id:it.id,col:it.col});
+    const L=nodes[it.id].l,R=nodes[it.id].r;
+    if(L!=null){ st.push({t:'push-left',id:it.id,child:L,col:it.col-1}); q.push({id:L,col:it.col-1}); }
+    if(R!=null){ st.push({t:'push-right',id:it.id,child:R,col:it.col+1}); q.push({id:R,col:it.col+1}); }
+  }
+  const statCols=assignColumns(nodes,root);
+  const keys=Array.from(new Set(Object.values(statCols))).sort((a,b)=>a-b);
+  keys.forEach(function(c,i){ st.push({t:'collect',col:c,idx:i}); });
+  st.push({t:'done'});
+  return st;
+}
+
+/* ================= two-part timeline ================= */
+const PARTS=[
+  {tree:'A', trace:buildTrace(TREES.A.nodes,ROOTS.A), short:'1 · sample tree (from main)'},
+  {tree:'B', trace:buildTrace(TREES.B.nodes,ROOTS.B), short:'2 · zigzag demo tree'}
+];
+let allSteps=[];
+PARTS.forEach(function(p,i){ if(i>0)allSteps.push({t:'intro',part:i}); p.start=allSteps.length; allSteps=allSteps.concat(p.trace); p.end=allSteps.length-1; });
+const LAST=allSteps.length-1;
+function phaseState(u){
+  if(u<0)return {part:0,local:-1,intro:false};
+  if(u===PARTS[1].start-1)return {part:1,local:-1,intro:true};
+  if(u>=PARTS[1].start)return {part:1,local:u-PARTS[1].start,intro:false};
+  return {part:0,local:u-PARTS[0].start,intro:false};
+}
+function fmtAns(ans){return '[['+ans.map(function(c){return c.join(', ');}).join('], [')+']]';}
+
+/* line indices into the code panel */
+const LL={init:3,pushRoot:5,pop:7,record:10,pushL:12,pushR:15,collect:19,ret:21};
+
+/* ================= replay ================= */
+function replay(trace,treeKey,u,partNo){
+  const nodes=TREES[treeKey].nodes;
+  const queue=[],cols={},colOf={},answer=[],inQueue=new Set();
+  let msg=(treeKey==='A')
+      ?'👋 Part '+partNo+': the exact tree from main(). BFS + a sorted column map produce the vertical order. ▶ Play — or Step.'
+      :'👋 Part '+partNo+': a zigzag chain — only two columns, revisited at alternating depths. ▶ Play — or Step.',
+      line=-1,edge=null,current=null,activeCol=null,banner=false,pushed=0,popped=0,doneAns=null,
+      lastInsert=null,lastAppend=null,collectIdx=null;
+  for(let k=0;k<=u&&k<trace.length;k++){
+    const s=trace[k];edge=null;activeCol=null;lastInsert=null;lastAppend=null;collectIdx=null;
+    if(s.t==='init'){
+      line=LL.init;msg='🧰 verticalOrder(root): create the columns map and the queue q';
+    }else if(s.t==='push-root'){
+      queue.push({id:s.id,col:0});inQueue.add(s.id);pushed++;
+      line=LL.pushRoot;msg='📥 q.push({node '+s.id+', column 0}) — the root starts at column 0';
+    }else if(s.t==='pop'){
+      const it=queue.shift();inQueue.delete(it.id);current=it.id;popped++;
+      line=LL.pop;msg='📤 Dequeue front: node '+it.id+' with column '+s.col+' — it becomes current ('+queue.length+' still in queue)';
+    }else if(s.t==='record'){
+      if(!cols[s.col]){cols[s.col]=[];lastInsert=s.col;}
+      cols[s.col].push(s.id);colOf[s.id]=s.col;activeCol=s.col;lastAppend=s.id;
+      line=LL.record;
+      msg=(lastInsert===s.col)
+        ?'🗝️ columns['+s.col+'] — NEW KEY '+s.col+' inserted (std::map keeps keys sorted automatically), then push_back('+s.id+')'
+        :'🎯 columns['+s.col+'].push_back('+s.id+') — the vector at key '+s.col+' grows (BFS ⇒ values land top-to-bottom)';
+    }else if(s.t==='push-left'){
+      queue.push({id:s.child,col:s.col});inQueue.add(s.child);pushed++;
+      edge={a:s.id,b:s.child,dir:'down'};
+      line=LL.pushL;msg='📥 node '+s.id+' has left child '+s.child+' → q.push({'+s.child+', column '+s.col+'}) (parent '+ (s.col+1) +' − 1)';
+    }else if(s.t==='push-right'){
+      queue.push({id:s.child,col:s.col});inQueue.add(s.child);pushed++;
+      edge={a:s.id,b:s.child,dir:'down'};
+      line=LL.pushR;msg='📥 node '+s.id+' has right child '+s.child+' → q.push({'+s.child+', column '+s.col+'}) (parent '+ (s.col-1) +' + 1)';
+    }else if(s.t==='collect'){
+      activeCol=s.col;collectIdx=s.idx;
+      answer.push((cols[s.col]||[]).slice());
+      line=LL.collect;
+      msg=(s.idx===0?'✅ Queue empty — BFS done. The map iterates keys in sorted order: ':'')+'take column '+s.col+' → answer['+s.idx+'] = ['+(cols[s.col]||[]).join(', ')+']';
+    }else if(s.t==='done'){
+      banner=true;current=null;doneAns=answer.slice();
+      line=LL.ret;
+      if(treeKey==='A'){
+        msg='🏁 Part '+partNo+' complete: answer = '+fmtAns(answer)+' — one BFS pass over '+popped+' nodes (O(n), plus log for the map keys).';
+      }else{
+        msg='🏁 All done! Part 2: answer = '+fmtAns(answer)+'. Recap: Part 1 → [[4], [2, 5], [1, 10, 9, 6], [3], [11]] · Part 2 → '+fmtAns(answer)+'. BFS + sorted map = vertical order.';
+      }
+    }
+  }
+  return {queue:queue,cols:cols,colOf:colOf,answer:answer,inQueue:inQueue,msg:msg,line:line,edge:edge,current:current,
+          activeCol:activeCol,banner:banner,pushed:pushed,popped:popped,lastInsert:lastInsert,lastAppend:lastAppend,collectIdx:collectIdx};
+}
+
+function replayPart(p,u){return replay(p.trace,p.tree,u,0);}
+const PARTSUMS=PARTS.map(function(p){return replayPart(p,p.trace.length-1);});
+const INTRO_MSG='🎬 Part 1 done: answer = '+fmtAns(PARTSUMS[0].answer)+' — notice lane 0 collected 1, 10, 9, 6 in level order. Now Part 2: a zigzag chain where the same two columns get revisited at alternating depths.';
+
+/* ================= code panel ================= */
+const CODE=[
+  '<span class="kw">vector</span>&lt;<span class="kw">vector</span>&lt;<span class="kw">int</span>&gt;&gt; <span class="fn">verticalOrder</span>(Node* root) {',
+  '    <span class="kw">vector</span>&lt;<span class="kw">vector</span>&lt;<span class="kw">int</span>&gt;&gt; answer;',
+  '    <span class="kw">if</span> (root == <span class="nu">nullptr</span>) <span class="kw">return</span> answer;',
+  '    <span class="kw">map</span>&lt;<span class="kw">int</span>, <span class="kw">vector</span>&lt;<span class="kw">int</span>&gt;&gt; columns;',
+  '    <span class="kw">queue</span>&lt;<span class="kw">pair</span>&lt;Node*, <span class="kw">int</span>&gt;&gt; q;',
+  '    q.push({root, <span class="nm">0</span>});',
+  '    <span class="kw">while</span> (!q.empty()) {',
+  '        Node* current = q.front().first;',
+  '        <span class="kw">int</span> column = q.front().second;',
+  '        q.pop();',
+  '        columns[column].push_back(current-&gt;data);',
+  '        <span class="kw">if</span> (current-&gt;left) {',
+  '            q.push({current-&gt;left, column - <span class="nm">1</span>});',
+  '        }',
+  '        <span class="kw">if</span> (current-&gt;right) {',
+  '            q.push({current-&gt;right, column + <span class="nm">1</span>});',
+  '        }',
+  '    }',
+  '    <span class="cm">// map is already sorted from smallest column to largest</span>',
+  '    <span class="kw">for</span> (<span class="kw">auto</span>&amp; entry : columns) {',
+  '        answer.push_back(entry.second);',
+  '    }',
+  '    <span class="kw">return</span> answer;',
+  '}'];
+const L_IDX={init:3,pushRoot:5,pop:7,record:10,pushL:12,pushR:15,collect:19,ret:22};
+
+/* ================= DOM / rendering ================= */
+if(typeof document!=='undefined'){
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('tree');
+function E(tag,attrs,parent){const el=document.createElementNS(NS,tag);for(const k in attrs)el.setAttribute(k,attrs[k]);if(parent)parent.appendChild(el);return el;}
+function marker(defs,id,color){const m=E('marker',{id:id,viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:6.5,markerHeight:6.5,orient:'auto-start-reverse'},defs);E('path',{d:'M0,0L10,5L0,10z',fill:color},m);}
+
+let nodeEls={},aLine=null,lanes={},laneKeys=[],renderedTree=null;
+function buildSVG(treeKey){
+  const td=TREES[treeKey];
+  svg.setAttribute('viewBox',td.vb);
+  svg.innerHTML='';
+  nodeEls={};lanes={};
+  const defs=E('defs',{},svg);
+  marker(defs,'arrDown','#f59e0b');
+  const gE=E('g',{},svg),gLanes=E('g',{},svg),gA=E('g',{},svg),gN=E('g',{},svg);
+  for(const [a,b] of td.edges){
+    const p1=td.pos[a],p2=td.pos[b];
+    E('line',{x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],class:'edge'},gE);
+  }
+  /* column lanes: each lane sits exactly under the tree nodes of that column */
+  const statCols=assignColumns(td.nodes,ROOTS[treeKey]);
+  laneKeys=Array.from(new Set(Object.values(statCols))).sort((a,b)=>a-b);
+  const cap=E('text',{x:18,y:td.capY,class:'lanecap'},gLanes);
+  cap.textContent='columns map (keys auto-sorted) ↓ answer';
+  laneKeys.forEach(function(c){
+    /* lane x = centroid of the tree nodes belonging to this column => perfect alignment */
+    let sx=0,cnt=0;
+    for(const id in statCols){ if(statCols[id]===c){ sx+=td.pos[id][0]; cnt++; } }
+    const x=sx/cnt;
+    const hd=E('text',{x:x,y:td.labelY,class:'lanehd'},gLanes);
+    hd.textContent='c = '+c;
+    hd.setAttribute('fill',colColor(c));
+    const laneBottom=td.ballTop+(td.laneMax-1)*32+22;
+    const ln=E('line',{x1:x,y1:td.guideTop,x2:x,y2:laneBottom,stroke:'#26344f','stroke-width':1.5,'stroke-dasharray':'2 6'},gLanes);
+    const bg=E('g',{},gLanes);
+    lanes[c]={x:x,line:ln,balls:bg};
+  });
+  aLine=E('line',{class:'aline'},gA);aLine.style.display='none';
+  for(const id of td.ids){
+    const p=td.pos[id],x=p[0],y=p[1],g=E('g',{},gN);
+    const c=E('circle',{cx:x,cy:y,r:26,class:'node'},g);
+    const t=E('text',{x:x,y:y,class:'nval'},g);t.textContent=id;
+    const cg=E('g',{},g);cg.style.display='none';
+    E('rect',{x:x-22,y:y+32,width:44,height:20,rx:7,fill:'#0f172a'},cg);
+    const ct=E('text',{x:x,y:y+45.5,'font-size':'11.5','font-weight':'700','text-anchor':'middle'},cg);
+    nodeEls[id]={c:c,cg:cg,ct:ct};
+  }
+  renderedTree=treeKey;
+}
+
+const codeBox=document.getElementById('code');
+CODE.forEach(function(h,i){
+  const d=document.createElement('div');d.className='cl';d.id='cl'+i;
+  d.innerHTML='<span class="ln">'+(i+1)+'</span><span class="lt">'+h+'</span>';
+  codeBox.appendChild(d);
+});
+
+const msgEl=document.getElementById('msg'),queueBox=document.getElementById('queueBox'),
+      statsEl=document.getElementById('stats'),counterEl=document.getElementById('counter'),
+      scrub=document.getElementById('scrub'),bPlay=document.getElementById('bPlay'),
+      ansLine=document.getElementById('ansLine'),
+      mapBox=document.getElementById('mapBox'),mapStatsEl=document.getElementById('mapStats'),
+      toutA=document.getElementById('toutA'),toutB=document.getElementById('toutB'),
+      tmid=document.getElementById('tmid'),twait=document.getElementById('twait');
+scrub.max=String(LAST);
+
+/* phase tracker buttons */
+const trackEl=document.getElementById('phasetrack'),trackBtns=[];
+PARTS.forEach(function(p,i){
+  const b=document.createElement('button');
+  b.textContent=p.short;
+  b.title='Jump to part '+(i+1);
+  b.onclick=function(){stopPlay();setIdx(p.start);};
+  trackEl.appendChild(b);trackBtns.push(b);
+});
+
+let idx=-1,playing=false,timer=null;
+const delay=()=>1650-Number(document.getElementById('speed').value)*155;
+
+function render(){
+  const ps=phaseState(idx);
+  const part=PARTS[ps.part];
+  if(part.tree!==renderedTree)buildSVG(part.tree);
+  const td=TREES[part.tree];
+  let st;
+  if(ps.intro){ st=replay(part.trace,part.tree,-1,2); st.msg=INTRO_MSG; }
+  else st=replay(part.trace,part.tree,ps.local,ps.part+1);
+
+  /* nodes */
+  for(const id of td.ids){
+    const el=nodeEls[id];let cl='node';
+    if(st.colOf[id]!=null)cl+=' '+colClass(st.colOf[id]);
+    if(st.inQueue.has(id))cl+=' queued';
+    if(st.current===id)cl+=' current';
+    el.c.setAttribute('class',cl);
+    if(st.colOf[id]!=null){
+      el.cg.style.display='';
+      const cc=colColor(st.colOf[id]);
+      el.cg.querySelector('rect').setAttribute('stroke',cc);
+      el.ct.setAttribute('fill',cc);
+      el.ct.textContent='c='+st.colOf[id];
+    } else el.cg.style.display='none';
+  }
+  /* lanes */
+  laneKeys.forEach(function(c){
+    const ln=lanes[c];
+    ln.balls.innerHTML='';
+    const items=st.cols[c]||[];
+    items.forEach(function(nid,i){
+      const y=td.ballTop+i*32;
+      E('circle',{cx:ln.x,cy:y,r:14,fill:'#0f1a2e',stroke:colColor(c),'stroke-width':2},ln.balls);
+      const t=E('text',{x:ln.x,y:y,class:'bval'},ln.balls);t.textContent=nid;
+    });
+    if(st.activeCol===c){ln.line.setAttribute('stroke','#f59e0b');ln.line.setAttribute('stroke-width','2.5');ln.line.setAttribute('stroke-dasharray','none');}
+    else{ln.line.setAttribute('stroke','#26344f');ln.line.setAttribute('stroke-width','1.5');ln.line.setAttribute('stroke-dasharray','2 6');}
+  });
+  /* enqueue edge */
+  if(st.edge){
+    const p1=td.pos[st.edge.a],p2=td.pos[st.edge.b];
+    const dx=p2[0]-p1[0],dy=p2[1]-p1[1],len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len;
+    aLine.setAttribute('x1',p1[0]+ux*28);aLine.setAttribute('y1',p1[1]+uy*28);
+    aLine.setAttribute('x2',p2[0]-ux*35);aLine.setAttribute('y2',p2[1]-uy*35);
+    aLine.setAttribute('class','aline down');
+    aLine.setAttribute('marker-end','url(#arrDown)');
+    aLine.style.display='';
+  } else aLine.style.display='none';
+  /* code highlight (map replay line constants onto panel indices) */
+  const hlMap={};hlMap[LL.init]=L_IDX.init;hlMap[LL.pushRoot]=L_IDX.pushRoot;hlMap[LL.pop]=L_IDX.pop;
+  hlMap[LL.record]=L_IDX.record;hlMap[LL.pushL]=L_IDX.pushL;hlMap[LL.pushR]=L_IDX.pushR;
+  hlMap[LL.collect]=L_IDX.collect;hlMap[LL.ret]=L_IDX.ret;
+  for(let i=0;i<CODE.length;i++)document.getElementById('cl'+i).classList.toggle('hl',hlMap[st.line]===i);
+  /* queue */
+  queueBox.innerHTML='';
+  if(!st.queue.length){queueBox.innerHTML='<span class="qempty">queue is empty</span>';}
+  st.queue.forEach(function(it,i){
+    const s=document.createElement('span');
+    s.className='qitem'+(i===0?' qfront':'');
+    s.style.borderLeftColor=colColor(it.col);
+    s.innerHTML=(i===0?'<span class="qlbl">◂ front</span>':'')+'node '+it.id+' · c='+it.col;
+    queueBox.appendChild(s);
+  });
+  /* answer line */
+  ansLine.textContent='answer = '+(st.answer.length?fmtAns(st.answer):'[]');
+  /* columns map panel */
+  mapBox.innerHTML='';
+  const mkeys=Object.keys(st.cols).map(Number).sort((a,b)=>a-b);
+  if(!mkeys.length){
+    mapBox.innerHTML='<div class="mempty">map is empty — a row appears the first time a key is used (rows stay sorted by key)</div>';
+  }
+  mkeys.forEach(function(c){
+    const row=document.createElement('div');
+    row.className='mrow'+(st.lastInsert===c?' newrow':'')+(st.activeCol===c?' activerow':'');
+    let cells='';
+    (st.cols[c]||[]).forEach(function(nid){
+      cells+='<span class="mcell'+((st.lastAppend===nid&&st.activeCol===c)?' pop':'')+'">'+nid+'</span>';
+    });
+    const tag=(st.activeCol===c&&st.collectIdx!=null)?'<span class="mtag">→ answer['+st.collectIdx+']</span>':'';
+    const cc=colColor(c);
+    row.innerHTML='<span class="mkey" style="background:'+cc+'22;border-color:'+cc+';color:'+cc+'">key '+c+'</span>'+
+                  '<span class="marrow">→</span><span class="vec">'+cells+'</span>'+tag;
+    mapBox.appendChild(row);
+  });
+  let valCount=0;mkeys.forEach(function(c){valCount+=st.cols[c].length;});
+  mapStatsEl.textContent='keys: '+mkeys.length+' · values: '+valCount;
+  /* phase tracker */
+  trackBtns.forEach(function(b,i){
+    const done=idx>=PARTS[i].end, active=(ps.part===i);
+    b.className=done?'done':(active?'active':'');
+    b.textContent=PARTS[i].short+(done?' → '+PARTSUMS[i].answer.length+' cols':'');
+  });
+  /* text bits */
+  msgEl.textContent=st.msg;
+  statsEl.textContent='enqueued: '+st.pushed+' · dequeued: '+st.popped+' · columns: '+Object.keys(st.cols).length;
+  counterEl.textContent='Step '+(idx+1)+' / '+allSteps.length+' · part '+(ps.part+1)+'/2';
+  scrub.value=String(idx);
+  bPlay.textContent=playing?'⏸ Pause':'▶ Play';
+  toutA.classList.toggle('hidden',idx<PARTS[0].end);
+  tmid.classList.toggle('hidden',idx<PARTS[1].start-1);
+  toutB.classList.toggle('hidden',idx<LAST);
+  twait.classList.toggle('hidden',idx>=PARTS[0].end);
+}
+
+/* ================= controls ================= */
+function setIdx(v){idx=Math.max(-1,Math.min(LAST,v));render();}
+function stopPlay(){if(playing){playing=false;clearTimeout(timer);render();}}
+function play(){if(idx>=LAST)setIdx(-1);playing=true;render();timer=setTimeout(tick,delay());}
+function tick(){if(!playing)return;if(idx>=LAST){stopPlay();return;}setIdx(idx+1);timer=setTimeout(tick,delay());}
+bPlay.onclick=function(){playing?stopPlay():play();};
+document.getElementById('bReset').onclick=function(){stopPlay();setIdx(-1);};
+document.getElementById('bPrev').onclick=function(){stopPlay();setIdx(idx-1);};
+document.getElementById('bNext').onclick=function(){stopPlay();setIdx(idx+1);};
+document.getElementById('bEnd').onclick=function(){stopPlay();setIdx(LAST);};
+scrub.addEventListener('input',function(){stopPlay();setIdx(Number(scrub.value));});
+document.getElementById('speed').addEventListener('input',function(){
+  if(playing){clearTimeout(timer);timer=setTimeout(tick,delay());}
+});
+document.addEventListener('keydown',function(e){
+  if(e.code==='Space'){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='ArrowRight'){e.preventDefault();stopPlay();setIdx(idx+1);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();stopPlay();setIdx(idx-1);}
+  else if(e.key==='Home'){stopPlay();setIdx(-1);}
+  else if(e.key==='End'){stopPlay();setIdx(LAST);}
+});
+render();
+}
+</script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f"}' crossorigin="anonymous"></script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a28731396cb4bdd5',t:'MTc4NjI4MzAzMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

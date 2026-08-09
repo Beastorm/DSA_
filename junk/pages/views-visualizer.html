@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Left & Right View — DFS Visualizer</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2c; --panel2:#0d1626; --border:#24324d;
+    --text:#e2e8f0; --muted:#94a3b8;
+    --amber:#f59e0b; --green:#22c55e; --red:#ef4444; --sky:#38bdf8; --purple:#c084fc; --gold:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 700px at 70% -10%, #16233d 0%, var(--bg) 55%);color:var(--text);
+       font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1240px;margin:0 auto;padding:22px 18px 40px;}
+  header h1{margin:0;font-size:24px;letter-spacing:.2px}
+  header .sub{margin:6px 0 0;color:var(--muted);font-size:14px;max-width:930px}
+  header code,.formula code,.note code{background:#1e293b;border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:12px;color:#fbbf24}
+  .grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(340px,1fr);gap:14px;margin-top:16px}
+  .leftcol{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .side{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 16px;min-width:0}
+  .card-title{font-size:11.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .stats{font-weight:500;letter-spacing:0;text-transform:none;color:#7dd3fc;font-size:12px}
+  svg{width:100%;height:auto;display:block}
+  .formula{margin-top:8px;color:var(--muted);font-size:13px;text-align:center}
+
+  .phasetrack{display:flex;gap:6px;flex-wrap:wrap}
+  .phasetrack button{padding:4px 10px;font-size:12px;border-radius:8px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted)}
+  .phasetrack button.active{background:var(--amber);border-color:var(--amber);color:#1f2937}
+  .phasetrack button.done{background:#052e16;border-color:#166534;color:#86efac}
+
+  /* ---- SVG tree ---- */
+  .edge{stroke:#334155;stroke-width:2}
+  .band{stroke:#26344f;stroke-width:1.5;stroke-dasharray:3 6}
+  .band.hot{stroke:var(--amber);stroke-width:2.5;stroke-dasharray:none}
+  .band.owned{stroke:#14532d;stroke-width:2.5;stroke-dasharray:none}
+  .bandlbl{fill:#64748b;font-size:11.5px;font-weight:700}
+  .bandlbl.owned{fill:#4ade80}
+  .node{fill:#1e293b;stroke:#64748b;stroke-width:2;transition:fill .2s,stroke .2s,opacity .3s}
+  .node.onstack{fill:#0c4a6e;stroke:var(--sky)}
+  .node.current{fill:#7c2d12;stroke:var(--amber);stroke-width:4}
+  .node.hidden{opacity:.5}
+  .node.view{stroke:var(--gold);stroke-width:4}
+  .nval{fill:#f1f5f9;font-weight:700;font-size:18px;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+  .aline{stroke-width:3;fill:none;stroke-dasharray:8 7;animation:flow .55s linear infinite}
+  .aline.down{stroke:var(--amber)}
+  .aline.up{stroke:var(--green)}
+  @keyframes flow{to{stroke-dashoffset:-15}}
+
+  /* ---- answer panel ---- */
+  #ansBox{display:flex;flex-wrap:wrap;gap:6px;min-height:38px;align-items:center}
+  .aempty{color:var(--muted);font-size:13px;font-style:italic}
+  .acell{font:700 13px ui-monospace,Menlo,monospace;background:#0f1a2e;border:1px solid #334155;border-radius:8px;padding:5px 10px;color:#e2e8f0}
+  .acell small{display:block;font-size:9.5px;color:var(--muted);font-weight:600;letter-spacing:.05em}
+  .acell.fresh{border-color:var(--amber);box-shadow:0 0 0 1px rgba(245,158,11,.4);color:#fde68a}
+
+  /* ---- code ---- */
+  #code{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:8px 0;overflow-x:auto}
+  .cl{padding:1.5px 12px 1.5px 8px;white-space:pre}
+  .cl .ln{display:inline-block;width:20px;margin-right:12px;text-align:right;color:#475569;user-select:none}
+  .cl.hl{background:rgba(245,158,11,.16);box-shadow:inset 3px 0 0 var(--amber)}
+  .kw{color:#c084fc} .fn{color:#7dd3fc} .nu{color:#fb923c} .nm{color:#4ade80} .cm{color:#64748b;font-style:italic}
+
+  /* ---- stack ---- */
+  #stack{display:flex;flex-direction:column;gap:6px;max-height:265px;overflow-y:auto;padding-right:4px}
+  .empty{color:var(--muted);font-size:13px;font-style:italic;padding:6px 2px}
+  .frame{border:1px solid #334155;border-radius:10px;padding:7px 10px;background:#0f1a2e;font-size:13px}
+  .frame.vw{border-left:3px solid var(--pink,#f472b6)}
+  .frame.dfs{border-left:3px solid var(--sky)}
+  .frame.top{border-color:var(--amber);box-shadow:0 0 0 1px rgba(245,158,11,.25)}
+  .frame.fret{border-color:var(--green)}
+  .ftitle{font:600 12.6px ui-monospace,Menlo,Consolas,monospace;color:#cbd5e1}
+  .toplbl{color:var(--amber);font-size:10.5px;font-family:system-ui;letter-spacing:.04em}
+  .fchips{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center}
+  .chip{font:600 11.5px ui-monospace,Menlo,monospace;background:#1e293b;border:1px solid #334155;color:#64748b;border-radius:6px;padding:2px 8px}
+  .chip.on{color:#a7f3d0;border-color:#14532d;background:#052e16}
+  .chip.live{color:#fbcfe8;border-color:#f472b6;background:#4a044e}
+  .chip.good{color:#bbf7d0;border-color:#166534;background:#14532d}
+  .chip.bad{color:#fecaca;border-color:#7f1d1d;background:#450a0a}
+  .res{font:700 11.5px ui-monospace,Menlo,monospace;border-radius:6px;padding:2px 8px;color:#bbf7d0;background:#14532d;border:1px solid #166534}
+
+  /* ---- message + controls ---- */
+  .msg-card{margin-top:14px;font-size:15px;min-height:46px;display:flex;align-items:center;gap:10px}
+  .msg-card::before{content:"💬";font-size:18px}
+  .controls{margin-top:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  .btns{display:flex;gap:8px}
+  button{background:#1e293b;color:var(--text);border:1px solid #334155;border-radius:10px;padding:8px 13px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
+  button:hover{background:#273549;border-color:#4a5c7a}
+  #bPlay{background:var(--amber);border-color:var(--amber);color:#1f2937;min-width:104px}
+  #bPlay:hover{background:#fbbf24}
+  #scrub{flex:1;min-width:200px;accent-color:var(--amber);cursor:pointer}
+  .meta{display:flex;align-items:center;gap:14px;color:var(--muted);font-size:12.5px;white-space:nowrap}
+  .spd{display:flex;align-items:center;gap:6px}
+  .spd input{accent-color:var(--amber);width:90px;cursor:pointer}
+
+  /* ---- terminal + legend ---- */
+  #term{margin:0;font:12.5px/1.75 ui-monospace,Menlo,Consolas,monospace;background:#020617;border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:#86efac}
+  .tc{color:#7dd3fc}
+  #twait{color:#64748b}
+  .hidden{display:none}
+  .legend{margin-top:14px;display:flex;flex-wrap:wrap;gap:16px;color:var(--muted);font-size:12.5px;align-items:center}
+  .legend i{display:inline-block;vertical-align:-2px;margin-right:6px}
+  .dot{width:12px;height:12px;border-radius:50%}
+  .dot.cur{background:#7c2d12;border:2.5px solid var(--amber)}
+  .dot.stk{background:#0c4a6e;border:2px solid var(--sky)}
+  .dot.vw{background:#1e293b;border:2.5px solid var(--gold)}
+  .dot.hd{background:#1e293b;border:2px solid #64748b;opacity:.5}
+  .lnDown{width:26px;height:0;border-top:3px dashed var(--amber)}
+  .lnUp{width:26px;height:0;border-top:3px dashed var(--green)}
+  .note{margin-top:10px;color:var(--muted);font-size:12.5px}
+  @media(max-width:960px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>👀 Left &amp; Right View — DFS Visualizer</h1>
+    <p class="sub">One guided flow, four parts. Both views use the same trick: a <b>preorder DFS</b> where the <i>first</i> node reached at each level wins — detected by <code>answer.size() == level</code>.
+       <b>leftDFS</b> visits the left child first, <b>rightDFS</b> visits the right child first… and that one-line difference flips the whole view. <b>Parts 1–2</b> run both on the tree from <code>main()</code>, <b>Parts 3–4</b> on a zigzag demo where the two views trace opposite chains. Just press ▶ Play.</p>
+  </header>
+
+  <div class="grid">
+    <div class="leftcol">
+    <section class="card">
+      <div class="card-title">
+        <span>Tree &amp; levels</span>
+        <span class="phasetrack" id="phasetrack"></span>
+      </div>
+      <svg id="tree" aria-label="binary tree with level bands"></svg>
+      <div class="formula">first node reached at a level = the visible node &nbsp;·&nbsp; <code>answer.size() == level</code> ⇔ "this level is still unclaimed"</div>
+    </section>
+
+    <section class="card">
+      <div class="card-title">answer vector <span class="stats" id="ansStats"></span></div>
+      <div id="ansBox"></div>
+      <div class="note">📏 <code>answer.size()</code> equals the number of levels already claimed — so when it equals the current <code>level</code>, this node is the first one there and gets pushed. One push per level, at most.</div>
+    </section>
+    </div>
+
+    <aside class="side">
+      <section class="card">
+        <div class="card-title">Code</div>
+        <div id="code"></div>
+      </section>
+      <section class="card">
+        <div class="card-title">Call stack <span class="stats" id="stats"></span></div>
+        <div id="stack"></div>
+        <div class="note">🔀 The ONLY difference between the two functions is the recursion order: <code>leftDFS</code> goes left-then-right, <code>rightDFS</code> goes right-then-left. Whichever side is explored first reaches each level first.</div>
+      </section>
+      <section class="card">
+        <div class="card-title">Program output</div>
+        <pre id="term"><span class="tc">$ g++ views.cpp -o views &amp;&amp; ./views</span>
+<span id="tl0" class="hidden">Left view:  [1, 2, 5]</span>
+<span id="tl1" class="hidden">Right view: [1, 3, 4]</span>
+<span id="tmid" class="hidden tc">$ ./views --demo zigzag-tree          # parts 3 &amp; 4 (demo run)</span>
+<span id="tl2" class="hidden">Left view:  [8, 9, 11, 13]</span>
+<span id="tl3" class="hidden">Right view: [8, 10, 12, 14]</span>
+<span id="twait">▊ waiting for the runs…</span></pre>
+      </section>
+    </aside>
+  </div>
+
+  <section class="card msg-card"><div id="msg"></div></section>
+
+  <section class="card controls">
+    <div class="btns">
+      <button id="bReset" title="Reset (Home)">⏮</button>
+      <button id="bPrev"  title="Step back (←)">⏴ Step</button>
+      <button id="bPlay"  title="Play / Pause (Space)">▶ Play</button>
+      <button id="bNext"  title="Step forward (→)">Step ⏵</button>
+      <button id="bEnd"   title="Jump to end (End)">⏭</button>
+    </div>
+    <input type="range" id="scrub" min="-1" max="1" value="-1" title="Scrub through the trace">
+    <div class="meta">
+      <span id="counter"></span>
+      <label class="spd" title="Playback speed">🐢 <input type="range" id="speed" min="1" max="10" value="6"> 🐇</label>
+    </div>
+  </section>
+
+  <div class="legend">
+    <span><i class="dot cur"></i>current call</span>
+    <span><i class="dot stk"></i>on the call stack</span>
+    <span><i class="dot vw"></i>in the view (level owner)</span>
+    <span><i class="dot hd"></i>hidden (level already claimed)</span>
+    <span><i class="lnDown"></i>call ↓</span>
+    <span><i class="lnUp"></i>return ↑</span>
+    <span style="color:#64748b">Shortcuts: Space = play/pause · ←/→ = step · Home/End</span>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================= tree definitions ================= */
+const TREES={
+  M:{ /* exact tree from main() */
+    nodes:{'1':{l:'2',r:'3'},'2':{l:null,r:'5'},'3':{l:null,r:'4'},'5':{l:null,r:null},'4':{l:null,r:null}},
+    ids:['1','2','3','5','4'],
+    edges:[['1','2'],['1','3'],['2','5'],['3','4']],
+    pos:{'1':[410,70],'2':[250,200],'3':[570,200],'5':[360,330],'4':[700,330]},
+    vb:'0 0 820 400'
+  },
+  D:{ /* zigzag demo: left view traces the left chain, right view the right chain */
+    nodes:{'8':{l:'9',r:'10'},'9':{l:'11',r:null},'10':{l:null,r:'12'},'11':{l:'13',r:null},
+           '12':{l:null,r:'14'},'13':{l:null,r:null},'14':{l:null,r:null}},
+    ids:['8','9','10','11','12','13','14'],
+    edges:[['8','9'],['8','10'],['9','11'],['10','12'],['11','13'],['12','14']],
+    pos:{'8':[410,60],'9':[260,170],'10':[560,170],'11':[140,280],'12':[680,280],'13':[70,390],'14':[750,390]},
+    vb:'0 0 820 460'
+  }
+};
+const ROOTS={M:'1',D:'8'};
+
+/* ================= trace generation (simulates answer.size() to know push vs skip) ================= */
+function buildTrace(nodes,root,dir){
+  const st=[];
+  st.push({t:'view-enter',dir:dir});
+  st.push({t:'view-init',dir:dir});
+  st.push({t:'view-call',dir:dir});
+  let size=0;
+  function D(id,level){
+    st.push({t:'enter',id:id,level:level});
+    if(id==null){ st.push({t:'base',level:level}); return; }
+    st.push({t:'check',id:id,level:level});
+    if(size===level){ st.push({t:'push',id:id,level:level}); size++; }
+    const first=dir==='L'?nodes[id].l:nodes[id].r;
+    const second=dir==='L'?nodes[id].r:nodes[id].l;
+    st.push({t:'go1',id:id,level:level+1,child:first});
+    D(first,level+1);
+    st.push({t:'go2',id:id,level:level+1,child:second});
+    D(second,level+1);
+    st.push({t:'ret',id:id,level:level});
+  }
+  D(root,0);
+  st.push({t:'view-ret',dir:dir});
+  st.push({t:'done'});
+  return st;
+}
+
+/* ================= four-part timeline ================= */
+const PARTS=[
+  {dir:'L',tree:'M',trace:buildTrace(TREES.M.nodes,ROOTS.M,'L'),short:'1 · LEFT · main tree'},
+  {dir:'R',tree:'M',trace:buildTrace(TREES.M.nodes,ROOTS.M,'R'),short:'2 · RIGHT · main tree'},
+  {dir:'L',tree:'D',trace:buildTrace(TREES.D.nodes,ROOTS.D,'L'),short:'3 · LEFT · demo tree'},
+  {dir:'R',tree:'D',trace:buildTrace(TREES.D.nodes,ROOTS.D,'R'),short:'4 · RIGHT · demo tree'}
+];
+let allSteps=[];
+PARTS.forEach(function(p,i){ if(i>0)allSteps.push({t:'intro',part:i}); p.start=allSteps.length; allSteps=allSteps.concat(p.trace); p.end=allSteps.length-1; });
+const LAST=allSteps.length-1;
+function phaseState(u){
+  if(u<0)return {part:0,local:-1,intro:false};
+  for(let i=1;i<PARTS.length;i++){ if(u===PARTS[i].start-1)return {part:i,local:-1,intro:true}; }
+  for(let i=PARTS.length-1;i>=0;i--){ if(u>=PARTS[i].start)return {part:i,local:u-PARTS[i].start,intro:false}; }
+  return {part:0,local:u,intro:false};
+}
+function fmtAns(a){return '['+a.join(', ')+']';}
+function popDone(stack){while(stack.length&&stack[stack.length-1].stage==='ret')stack.pop();}
+
+/* line maps */
+const LMAP={L:{enter:1,check:2,push:3,go1:5,go2:6,ret:7,vEnter:18,vInit:19,vCall:20,vRet:21},
+            R:{enter:10,check:11,push:12,go1:14,go2:15,ret:16,vEnter:24,vInit:25,vCall:26,vRet:27}};
+
+/* ================= replay ================= */
+function replay(part,u,partNo){
+  const dir=part.dir,treeKey=part.tree,trace=part.trace;
+  const nodes=TREES[treeKey].nodes,LM=LMAP[dir];
+  const fnName=dir==='L'?'leftDFS':'rightDFS',viewName=dir==='L'?'leftView':'rightView',sideWord=dir==='L'?'left':'right';
+  const stack=[],answer=[],resolved={},owner={};
+  let msg=(dir==='L')
+      ?'👋 Part '+partNo+' — '+fnName+' on the '+(treeKey==='M'?'tree from main()':'zigzag demo tree')+': preorder with the '+sideWord.toUpperCase()+' child FIRST. ▶ Play — or Step.'
+      :'👋 Part '+partNo+' — '+fnName+' on the '+(treeKey==='M'?'SAME tree':'zigzag demo tree')+': preorder with the '+sideWord.toUpperCase()+' child FIRST. ▶ Play — or Step.',
+      line=-1,edge=null,activeLevel=null,banner=false,calls=0,nullCalls=0,lastPushed=null;
+  for(let k=0;k<=u&&k<trace.length;k++){
+    const s=trace[k];edge=null;activeLevel=null;lastPushed=null;
+    const topF=()=>stack[stack.length-1];
+    if(s.t==='view-enter'){
+      stack.push({fn:'VIEW',dir:dir,stage:'run'});
+      line=LM.vEnter;msg='📞 '+viewName+'(root) called';
+    }else if(s.t==='view-init'){
+      line=LM.vInit;msg='🔧 vector<int> answer created — empty for now';
+    }else if(s.t==='view-call'){
+      line=LM.vCall;msg='⬇️ '+fnName+'(root, 0, answer) — preorder, '+sideWord+' child first';
+    }else if(s.t==='enter'){
+      if(s.id==null){
+        nullCalls++;stack.push({fn:'DFS',dir:dir,id:null,level:s.level,stage:'check'});
+        line=LM.enter;msg='📞 '+fnName+'(NULL, level '+s.level+')';
+      }else{
+        calls++;stack.push({fn:'DFS',dir:dir,id:s.id,level:s.level,stage:'check'});
+        line=LM.enter;msg='📞 '+fnName+'(node '+s.id+', level '+s.level+')';
+      }
+    }else if(s.t==='base'){
+      const f=topF();f.stage='ret';
+      line=LM.enter;msg='↩️ nullptr → return (nothing at level '+s.level+' down here)';
+    }else if(s.t==='check'){
+      const f=topF();f.stage='chk';activeLevel=s.level;
+      line=LM.check;
+      if(answer.length===s.level){
+        msg='🔎 answer.size() == '+s.level+' ('+answer.length+' == '+s.level+') → level '+s.level+' is UNCLAIMED…';
+      }else{
+        const own=owner[s.level];
+        resolved[s.id]={level:s.level,inView:false};
+        f.outcome='hidden';
+        msg='🔎 answer.size() == '+answer.length+' ≠ '+s.level+' → level '+s.level+' is already owned by node '+own+' — node '+s.id+' stays HIDDEN';
+      }
+    }else if(s.t==='push'){
+      const f=topF();
+      answer.push(s.id);owner[s.level]=s.id;resolved[s.id]={level:s.level,inView:true};
+      f.outcome='view';lastPushed=s.id;
+      line=LM.push;msg='✅ answer.push_back('+s.id+') — first node reached at level '+s.level+', visible from the '+sideWord+'!';
+    }else if(s.t==='go1'){
+      const f=topF();f.stage='g1';
+      if(s.child!=null)edge={a:s.id,b:s.child,dir:'down'};
+      line=LM.go1;msg='⬇️ recurse into the '+sideWord.toUpperCase()+' child first: '+fnName+'('+(s.child!=null?'node '+s.child:'NULL')+', level '+s.level+')';
+    }else if(s.t==='go2'){
+      popDone(stack);
+      const f=topF();f.stage='g2';
+      const other=dir==='L'?'RIGHT':'LEFT';
+      if(s.child!=null)edge={a:s.id,b:s.child,dir:'down'};
+      line=LM.go2;msg='⬇️ now the '+other+' child: '+fnName+'('+(s.child!=null?'node '+s.child:'NULL')+', level '+s.level+')';
+    }else if(s.t==='ret'){
+      popDone(stack);
+      const f=topF();f.stage='ret';
+      const parent=stack.length>1?stack[stack.length-2]:null;
+      edge=(parent&&parent.fn==='DFS'&&parent.id!=null)?{a:s.id,b:parent.id,dir:'up'}:null;
+      line=LM.ret;msg='↩️ '+fnName+'(node '+s.id+', level '+s.level+') finished';
+    }else if(s.t==='view-ret'){
+      popDone(stack);
+      const f=topF();f.stage='ret';f.res=answer.slice();
+      line=LM.vRet;msg='✅ '+viewName+' returns answer = '+fmtAns(answer);
+    }else if(s.t==='done'){
+      popDone(stack);banner=true;line=-1;
+      msg='🏁 Part '+partNo+' ('+fnName+') complete: view = '+fmtAns(answer)+' — '+calls+' node visits, '+nullCalls+' null calls, one preorder pass = O(n).';
+    }
+  }
+  return {stack:stack,answer:answer,resolved:resolved,owner:owner,msg:msg,line:line,edge:edge,activeLevel:activeLevel,
+          banner:banner,calls:calls,nullCalls:nullCalls,lastPushed:lastPushed};
+}
+/* NOTE: 'push' steps are injected below during trace build — see buildTrace patch */
+function replayPart(p,u){return replay(p,u,0);}
+const PARTSUMS=PARTS.map(function(p){return replayPart(p,p.trace.length-1);});
+
+const INTROS=[null,
+  '🎬 Part 1 done: LEFT view = '+fmtAns(PARTSUMS[0].answer)+' — notice node 5 made the view even though it’s a RIGHT child (nothing sits to its left at level 2). Now the SAME tree with rightDFS — right child first. Watch the view flip.',
+  '🎬 Same tree, two views: LEFT '+fmtAns(PARTSUMS[0].answer)+' vs RIGHT '+fmtAns(PARTSUMS[1].answer)+' — only the recursion order changed. Now Part 3: a deeper zigzag demo tree, left view first.',
+  '🎬 Left view of the demo = '+fmtAns(PARTSUMS[2].answer)+' — it traced the left zigzag chain. Now rightDFS on the same tree — it should trace the opposite chain.'];
+const FINAL_MSG='🏁 Complete! Views — main tree: left '+fmtAns(PARTSUMS[0].answer)+' · right '+fmtAns(PARTSUMS[1].answer)+' · demo tree: left '+fmtAns(PARTSUMS[2].answer)+' · right '+fmtAns(PARTSUMS[3].answer)+'. Same trick everywhere: first node reached at each level wins (answer.size() == level).';
+
+/* ================= code panel ================= */
+const CODE=[
+  '<span class="kw">void</span> <span class="fn">leftDFS</span>(Node* root, <span class="kw">int</span> level, <span class="kw">vector</span>&lt;<span class="kw">int</span>&gt;&amp; answer) {',
+  '    <span class="kw">if</span> (root == <span class="nu">nullptr</span>) <span class="kw">return</span>;',
+  '    <span class="kw">if</span> (answer.size() == level) {',
+  '        answer.push_back(root-&gt;data);',
+  '    }',
+  '    <span class="fn">leftDFS</span>(root-&gt;left, level + <span class="nm">1</span>, answer);',
+  '    <span class="fn">leftDFS</span>(root-&gt;right, level + <span class="nm">1</span>, answer);',
+  '}',
+  '',
+  '<span class="kw">void</span> <span class="fn">rightDFS</span>(Node* root, <span class="kw">int</span> level, <span class="kw">vector</span>&lt;<span class="kw">int</span>&gt;&amp; answer) {',
+  '    <span class="kw">if</span> (root == <span class="nu">nullptr</span>) <span class="kw">return</span>;',
+  '    <span class="kw">if</span> (answer.size() == level) {',
+  '        answer.push_back(root-&gt;data);',
+  '    }',
+  '    <span class="fn">rightDFS</span>(root-&gt;right, level + <span class="nm">1</span>, answer);',
+  '    <span class="fn">rightDFS</span>(root-&gt;left, level + <span class="nm">1</span>, answer);',
+  '}',
+  '',
+  '<span class="kw">vector</span>&lt;<span class="kw">int</span>&gt; <span class="fn">leftView</span>(Node* root) {',
+  '    <span class="kw">vector</span>&lt;<span class="kw">int</span>&gt; answer;',
+  '    <span class="fn">leftDFS</span>(root, <span class="nm">0</span>, answer);',
+  '    <span class="kw">return</span> answer;',
+  '}',
+  '',
+  '<span class="kw">vector</span>&lt;<span class="kw">int</span>&gt; <span class="fn">rightView</span>(Node* root) {',
+  '    <span class="kw">vector</span>&lt;<span class="kw">int</span>&gt; answer;',
+  '    <span class="fn">rightDFS</span>(root, <span class="nm">0</span>, answer);',
+  '    <span class="kw">return</span> answer;',
+  '}'];
+
+/* ================= DOM / rendering ================= */
+if(typeof document!=='undefined'){
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('tree');
+function E(tag,attrs,parent){const el=document.createElementNS(NS,tag);for(const k in attrs)el.setAttribute(k,attrs[k]);if(parent)parent.appendChild(el);return el;}
+function marker(defs,id,color){const m=E('marker',{id:id,viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:6.5,markerHeight:6.5,orient:'auto-start-reverse'},defs);E('path',{d:'M0,0L10,5L0,10z',fill:color},m);}
+
+let nodeEls={},aLine=null,bandEls=[],renderedTree=null;
+function buildSVG(treeKey){
+  const td=TREES[treeKey];
+  svg.setAttribute('viewBox',td.vb);
+  svg.innerHTML='';
+  nodeEls={};bandEls=[];
+  const defs=E('defs',{},svg);
+  marker(defs,'arrDown','#f59e0b');marker(defs,'arrUp','#22c55e');
+  const gB=E('g',{},svg),gE=E('g',{},svg),gA=E('g',{},svg),gN=E('g',{},svg);
+  /* level bands */
+  const ys=Array.from(new Set(td.ids.map(id=>td.pos[id][1]))).sort((a,b)=>a-b);
+  ys.forEach(function(y,d){
+    const ln=E('line',{x1:24,y1:y,x2:796,y2:y,class:'band'},gB);
+    const lb=E('text',{x:28,y:y-10,class:'bandlbl'},gB);
+    lb.textContent='level '+d;
+    bandEls.push({y:y,line:ln,label:lb});
+  });
+  for(const [a,b] of td.edges){
+    const p1=td.pos[a],p2=td.pos[b];
+    E('line',{x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],class:'edge'},gE);
+  }
+  aLine=E('line',{class:'aline'},gA);aLine.style.display='none';
+  for(const id of td.ids){
+    const p=td.pos[id],x=p[0],y=p[1],g=E('g',{},gN);
+    const c=E('circle',{cx:x,cy:y,r:26,class:'node'},g);
+    const t=E('text',{x:x,y:y,class:'nval'},g);t.textContent=id;
+    const cg=E('g',{},g);cg.style.display='none';
+    E('rect',{x:x-32,y:y+32,width:64,height:20,rx:7,fill:'#0f172a'},cg);
+    const ct=E('text',{x:x,y:y+45.5,'font-size':'11.5','font-weight':'700','text-anchor':'middle'},cg);
+    nodeEls[id]={c:c,cg:cg,ct:ct};
+  }
+  renderedTree=treeKey;
+}
+
+const codeBox=document.getElementById('code');
+CODE.forEach(function(h,i){
+  const d=document.createElement('div');d.className='cl';d.id='cl'+i;
+  d.innerHTML='<span class="ln">'+(i+1)+'</span><span class="lt">'+h+'</span>';
+  codeBox.appendChild(d);
+});
+
+const msgEl=document.getElementById('msg'),stackEl=document.getElementById('stack'),
+      statsEl=document.getElementById('stats'),counterEl=document.getElementById('counter'),
+      scrub=document.getElementById('scrub'),bPlay=document.getElementById('bPlay'),
+      ansBox=document.getElementById('ansBox'),ansStatsEl=document.getElementById('ansStats'),
+      tlEls=[0,1,2,3].map(i=>document.getElementById('tl'+i)),
+      tmid=document.getElementById('tmid'),twait=document.getElementById('twait');
+scrub.max=String(LAST);
+
+/* phase tracker */
+const trackEl=document.getElementById('phasetrack'),trackBtns=[];
+PARTS.forEach(function(p,i){
+  const b=document.createElement('button');
+  b.textContent=p.short;
+  b.title='Jump to part '+(i+1);
+  b.onclick=function(){stopPlay();setIdx(p.start);};
+  trackEl.appendChild(b);trackBtns.push(b);
+});
+
+let idx=-1,playing=false,timer=null;
+const delay=()=>1650-Number(document.getElementById('speed').value)*155;
+
+function render(){
+  const ps=phaseState(idx);
+  const part=PARTS[ps.part];
+  if(part.tree!==renderedTree)buildSVG(part.tree);
+  const td=TREES[part.tree];
+  let st;
+  if(ps.intro){ st=replay(part,-1,ps.part+1); st.msg=INTROS[ps.part]; }
+  else st=replay(part,ps.local,ps.part+1);
+  if(idx>=LAST)st.msg=FINAL_MSG;
+
+  /* level bands */
+  bandEls.forEach(function(b,d){
+    let cls='band';
+    if(st.owner[d]!=null)cls+=' owned';
+    if(st.activeLevel===d)cls+=' hot';
+    b.line.setAttribute('class',cls);
+    b.label.setAttribute('class','bandlbl'+(st.owner[d]!=null?' owned':''));
+    b.label.textContent='level '+d+(st.owner[d]!=null?'  ✓ '+st.owner[d]:'');
+  });
+  /* nodes */
+  const inStack=new Set(st.stack.filter(f=>f.id!=null).map(f=>String(f.id)));
+  const top=st.stack.length?st.stack[st.stack.length-1]:null;
+  const current=(top&&top.fn==='DFS'&&top.id!=null&&top.stage!=='ret')?String(top.id):null;
+  for(const id of td.ids){
+    const el=nodeEls[id];let cl='node';
+    if(inStack.has(id)&&current!==id)cl+=' onstack';
+    if(current===id)cl+=' current';
+    const r=st.resolved[id];
+    if(r&&r.inView&&st.banner)cl+=' view';
+    if(r&&!r.inView)cl+=' hidden';
+    el.c.setAttribute('class',cl);
+    if(r){
+      el.cg.style.display='';
+      const rect=el.cg.querySelector('rect');
+      if(r.inView){rect.setAttribute('stroke','#22c55e');el.ct.setAttribute('fill','#86efac');el.ct.textContent='level '+r.level+' ✓';}
+      else{rect.setAttribute('stroke','#ef4444');el.ct.setAttribute('fill','#fca5a5');el.ct.textContent='level '+r.level+' ✗';}
+    } else el.cg.style.display='none';
+  }
+  /* active edge */
+  if(st.edge){
+    const p1=td.pos[st.edge.a],p2=td.pos[st.edge.b];
+    const dx=p2[0]-p1[0],dy=p2[1]-p1[1],len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len;
+    aLine.setAttribute('x1',p1[0]+ux*28);aLine.setAttribute('y1',p1[1]+uy*28);
+    aLine.setAttribute('x2',p2[0]-ux*35);aLine.setAttribute('y2',p2[1]-uy*35);
+    aLine.setAttribute('class','aline '+(st.edge.dir==='down'?'down':'up'));
+    aLine.setAttribute('marker-end',st.edge.dir==='down'?'url(#arrDown)':'url(#arrUp)');
+    aLine.style.display='';
+  } else aLine.style.display='none';
+  /* code highlight */
+  for(let i=0;i<CODE.length;i++)document.getElementById('cl'+i).classList.toggle('hl',st.line===i);
+  /* answer panel */
+  ansBox.innerHTML='';
+  if(!st.answer.length){ansBox.innerHTML='<span class="aempty">answer is empty — the first node of level 0 is about to be pushed…</span>';}
+  st.answer.forEach(function(id,i){
+    const s=document.createElement('span');
+    s.className='acell'+(st.lastPushed===id?' fresh':'');
+    s.innerHTML=id+'<small>LEVEL '+i+'</small>';
+    ansBox.appendChild(s);
+  });
+  ansStatsEl.textContent='size: '+st.answer.length+' · pushes: '+st.answer.length;
+  /* stack */
+  stackEl.innerHTML='';
+  if(!st.stack.length){
+    stackEl.innerHTML='<div class="empty">'+(st.banner?'all frames returned — the stack is empty again':'the stack is empty — nothing running yet')+'</div>';
+  }
+  st.stack.forEach(function(f,i){
+    const d=document.createElement('div');
+    const isTop=i===st.stack.length-1;
+    d.className='frame '+(f.fn==='VIEW'?'vw':'dfs')+(isTop?' top':'')+(f.stage==='ret'?' fret':'');
+    let chips='';
+    if(f.fn==='VIEW'){
+      chips=f.stage==='ret'
+        ?'<span class="res">returns '+fmtAns(f.res)+'</span>'
+        :'<span class="chip live">answer = '+fmtAns(st.answer)+'</span>';
+    }else{
+      chips='<span class="chip on">level '+f.level+'</span>';
+      if(f.outcome==='view')chips+='<span class="chip good">in view ✓</span>';
+      if(f.outcome==='hidden')chips+='<span class="chip bad">hidden ✗</span>';
+    }
+    const icon=f.fn==='VIEW'?'👀':'🧭';
+    const fnName=f.dir==='L'?'leftDFS':'rightDFS';
+    const title=f.fn==='VIEW'?((f.dir==='L'?'leftView':'rightView')+'(root)')
+      :(f.id!=null?fnName+'(node '+f.id+', lvl '+f.level+')':fnName+'(NULL, lvl '+f.level+')');
+    d.innerHTML='<div class="ftitle">'+icon+' '+title+(isTop?' <span class="toplbl">◂ top</span>':'')+'</div>'+
+                (chips?'<div class="fchips">'+chips+'</div>':'');
+    stackEl.appendChild(d);
+  });
+  /* phase tracker */
+  trackBtns.forEach(function(b,i){
+    const done=idx>=PARTS[i].end,active=(ps.part===i);
+    b.className=done?'done':(active?'active':'');
+    b.textContent=PARTS[i].short+(done?' → '+PARTSUMS[i].answer.length+' nodes':'');
+  });
+  /* text bits */
+  msgEl.textContent=st.msg;
+  statsEl.textContent='visits: '+st.calls+' nodes + '+st.nullCalls+' nulls';
+  counterEl.textContent='Step '+(idx+1)+' / '+allSteps.length+' · part '+(ps.part+1)+'/4';
+  scrub.value=String(idx);
+  bPlay.textContent=playing?'⏸ Pause':'▶ Play';
+  PARTS.forEach(function(p,i){ tlEls[i].classList.toggle('hidden',idx<p.end); });
+  tmid.classList.toggle('hidden',idx<PARTS[2].start-1);
+  twait.classList.toggle('hidden',idx>=PARTS[0].end);
+}
+
+/* ================= controls ================= */
+function setIdx(v){idx=Math.max(-1,Math.min(LAST,v));render();}
+function stopPlay(){if(playing){playing=false;clearTimeout(timer);render();}}
+function play(){if(idx>=LAST)setIdx(-1);playing=true;render();timer=setTimeout(tick,delay());}
+function tick(){if(!playing)return;if(idx>=LAST){stopPlay();return;}setIdx(idx+1);timer=setTimeout(tick,delay());}
+bPlay.onclick=function(){playing?stopPlay():play();};
+document.getElementById('bReset').onclick=function(){stopPlay();setIdx(-1);};
+document.getElementById('bPrev').onclick=function(){stopPlay();setIdx(idx-1);};
+document.getElementById('bNext').onclick=function(){stopPlay();setIdx(idx+1);};
+document.getElementById('bEnd').onclick=function(){stopPlay();setIdx(LAST);};
+scrub.addEventListener('input',function(){stopPlay();setIdx(Number(scrub.value));});
+document.getElementById('speed').addEventListener('input',function(){
+  if(playing){clearTimeout(timer);timer=setTimeout(tick,delay());}
+});
+document.addEventListener('keydown',function(e){
+  if(e.code==='Space'){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='ArrowRight'){e.preventDefault();stopPlay();setIdx(idx+1);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();stopPlay();setIdx(idx-1);}
+  else if(e.key==='Home'){stopPlay();setIdx(-1);}
+  else if(e.key==='End'){stopPlay();setIdx(LAST);}
+});
+render();
+}
+</script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f"}' crossorigin="anonymous"></script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a287314b2b50bdd5',t:'MTc4NjI4MzAzNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
