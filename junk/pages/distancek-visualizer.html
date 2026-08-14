@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Nodes at Distance K — Visualizer</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2c; --panel2:#0d1626; --border:#24324d;
+    --text:#e2e8f0; --muted:#94a3b8;
+    --amber:#f59e0b; --green:#22c55e; --red:#ef4444; --sky:#38bdf8; --pink:#f472b6; --gold:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 700px at 70% -10%, #16233d 0%, var(--bg) 55%);color:var(--text);
+       font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1240px;margin:0 auto;padding:22px 18px 40px;}
+  header h1{margin:0;font-size:24px;letter-spacing:.2px}
+  header .sub{margin:6px 0 0;color:var(--muted);font-size:14px;max-width:930px}
+  header code,.formula code,.note code{background:#1e293b;border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:12px;color:#fbbf24}
+  .grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(340px,1fr);gap:14px;margin-top:16px}
+  .leftcol{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .side{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 16px;min-width:0}
+  .card-title{font-size:11.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .stats{font-weight:500;letter-spacing:0;text-transform:none;color:#7dd3fc;font-size:12px}
+  .tgtbadge{font:700 12px ui-monospace,Menlo,monospace;color:#fde68a;background:#4a3a06;border:1px solid var(--gold);border-radius:7px;padding:3px 9px;letter-spacing:0;text-transform:none}
+  svg{width:100%;height:auto;display:block}
+  .formula{margin-top:8px;color:var(--muted);font-size:13px;text-align:center}
+
+  .phasetrack{display:flex;gap:6px;flex-wrap:wrap}
+  .phasetrack button{padding:4px 10px;font-size:12px;border-radius:8px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted)}
+  .phasetrack button.active{background:var(--amber);border-color:var(--amber);color:#1f2937}
+  .phasetrack button.done{background:#052e16;border-color:#166534;color:#86efac}
+
+  /* ---- SVG ---- */
+  .edge{stroke:#334155;stroke-width:2}
+  .node{fill:#1e293b;stroke:#64748b;stroke-width:2;transition:fill .2s,stroke .2s,opacity .3s}
+  .node.vis{stroke-width:3}
+  .node.current{fill:#7c2d12;stroke:var(--amber);stroke-width:4}
+  .node.unreached{opacity:.45}
+  .nval{fill:#f1f5f9;font-weight:700;font-size:18px;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+  .tring{fill:none;stroke:var(--gold);stroke-width:2;stroke-dasharray:5 4}
+  .tlbl{fill:var(--gold);font-size:11px;font-weight:800;text-anchor:middle}
+  .star{fill:var(--gold);font-size:14px;font-weight:800;text-anchor:middle}
+  .dchr rect{fill:#0f172a;stroke-width:1.3}
+  .dchr text{font-size:11.5px;font-weight:700;text-anchor:middle}
+  .aline{stroke-width:3;fill:none;stroke-dasharray:8 7;animation:flow .55s linear infinite}
+  .aline.down{stroke:var(--amber)}
+  .aline.up{stroke:var(--pink)}
+  @keyframes flow{to{stroke-dashoffset:-15}}
+
+  /* ---- levels panel ---- */
+  .lrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#0d1626;border:1px solid var(--border);border-radius:9px;padding:6px 10px;margin-top:6px}
+  .lrow.active{border-color:var(--amber);box-shadow:0 0 0 1px rgba(245,158,11,.3)}
+  .lrow.ans{border-color:var(--gold);box-shadow:0 0 0 1px rgba(251,191,36,.35)}
+  .llab{font:700 11.5px ui-monospace,Menlo,monospace;color:var(--muted);min-width:74px}
+  .lcell{font:700 12.5px ui-monospace,Menlo,monospace;border:1px solid;border-radius:7px;padding:3px 9px}
+  .lempty{color:#475569;font-size:12px;font-style:italic}
+  .qrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .qlab{font:700 11.5px ui-monospace,Menlo,monospace;color:var(--muted)}
+  .qcell{font:700 12.5px ui-monospace,Menlo,monospace;background:#0f1a2e;border:1px solid #334155;border-left:4px solid var(--sky);border-radius:8px;padding:3px 9px;color:#e2e8f0}
+
+  /* ---- parent map panel ---- */
+  #mapBox{display:flex;flex-direction:column;gap:5px;max-height:230px;overflow-y:auto}
+  .mempty{color:var(--muted);font-size:13px;font-style:italic}
+  .mrow{display:flex;align-items:center;gap:8px;font:600 12.5px ui-monospace,Menlo,monospace;background:#0d1626;border:1px solid var(--border);border-radius:8px;padding:4px 10px}
+  .mrow.fresh{border-color:var(--amber);box-shadow:0 0 0 1px rgba(245,158,11,.35)}
+  .mchild{color:#e2e8f0}
+  .marrow{color:var(--pink);font-weight:700}
+  .mpar{color:#f9a8d4}
+  .mnote{color:#475569;font-size:11px;margin-left:auto}
+
+  /* ---- code ---- */
+  #code{font:11.4px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:8px 0;overflow-x:auto;max-height:420px}
+  .cl{padding:1px 12px 1px 8px;white-space:pre}
+  .cl .ln{display:inline-block;width:20px;margin-right:12px;text-align:right;color:#475569;user-select:none}
+  .cl.hl{background:rgba(245,158,11,.16);box-shadow:inset 3px 0 0 var(--amber)}
+  .kw{color:#c084fc} .fn{color:#7dd3fc} .nu{color:#fb923c} .nm{color:#4ade80} .cm{color:#64748b;font-style:italic}
+
+  /* ---- message + controls ---- */
+  .msg-card{margin-top:14px;font-size:15px;min-height:46px;display:flex;align-items:center;gap:10px}
+  .msg-card::before{content:"💬";font-size:18px}
+  .controls{margin-top:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  .btns{display:flex;gap:8px}
+  button{background:#1e293b;color:var(--text);border:1px solid #334155;border-radius:10px;padding:8px 13px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
+  button:hover{background:#273549;border-color:#4a5c7a}
+  #bPlay{background:var(--amber);border-color:var(--amber);color:#1f2937;min-width:104px}
+  #bPlay:hover{background:#fbbf24}
+  #scrub{flex:1;min-width:200px;accent-color:var(--amber);cursor:pointer}
+  .meta{display:flex;align-items:center;gap:14px;color:var(--muted);font-size:12.5px;white-space:nowrap}
+  .spd{display:flex;align-items:center;gap:6px}
+  .spd input{accent-color:var(--amber);width:90px;cursor:pointer}
+
+  /* ---- terminal + legend ---- */
+  #term{margin:0;font:12.5px/1.75 ui-monospace,Menlo,Consolas,monospace;background:#020617;border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:#86efac}
+  .tc{color:#7dd3fc}
+  #twait{color:#64748b}
+  .hidden{display:none}
+  .legend{margin-top:14px;display:flex;flex-wrap:wrap;gap:16px;color:var(--muted);font-size:12.5px;align-items:center}
+  .legend i{display:inline-block;vertical-align:-2px;margin-right:6px}
+  .dot{width:12px;height:12px;border-radius:50%}
+  .dot.cur{background:#7c2d12;border:2.5px solid var(--amber)}
+  .dot.tgt{background:#1e293b;border:2px dashed var(--gold)}
+  .dot.unr{background:#1e293b;border:2px solid #64748b;opacity:.45}
+  .lnDown{width:26px;height:0;border-top:3px dashed var(--amber)}
+  .lnUp{width:26px;height:0;border-top:3px dashed var(--pink)}
+  .note{margin-top:10px;color:var(--muted);font-size:12.5px}
+  @media(max-width:960px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🎯 Nodes at Distance K — Parent-Map BFS Visualizer</h1>
+    <p class="sub">One guided flow, two parts. <b>Phase 1</b> builds a <code>parentMap</code> with a BFS so we can move <i>upward</i> — turning the tree into an undirected graph. <b>Phase 2</b> runs a level-order BFS from the target in <b>three directions</b> (left, right, parent) and stops at distance <code>k</code>.
+       <b>Part 1</b> is the exact <code>main()</code> case (target 5, k=2), <b>Part 2</b> targets the root with k=3. Just press ▶ Play.</p>
+  </header>
+
+  <div class="grid">
+    <div class="leftcol">
+    <section class="card">
+      <div class="card-title">
+        <span>Tree</span>
+        <span class="tgtbadge" id="tgtBadge">🎯 target 5 · k = 2</span>
+        <span class="phasetrack" id="phasetrack"></span>
+      </div>
+      <svg id="tree" aria-label="binary tree"></svg>
+      <div class="formula">phase 1: every node learns its parent · phase 2: BFS in 3 directions (left · right · <b>up</b>) until distance k</div>
+    </section>
+
+    <section class="card">
+      <div class="card-title">Distance levels from the target <span class="stats" id="lvlStats"></span></div>
+      <div id="levelsBox"></div>
+      <div class="qrow" id="qrow"><span class="qlab">queue:</span><span class="lempty" id="qempty">—</span></div>
+      <div class="note">Each row is one BFS level = one distance from the target. When the loop reaches <code>currentLevel == k</code> it <b>breaks</b>, and whatever is in the queue is exactly the answer.</div>
+    </section>
+    </div>
+
+    <aside class="side">
+      <section class="card">
+        <div class="card-title">Code</div>
+        <div id="code"></div>
+      </section>
+      <section class="card">
+        <div class="card-title">parentMap <span class="stats" id="mapStats"></span></div>
+        <div id="mapBox"></div>
+        <div class="note">🔗 Built by a plain BFS from the root. With parent pointers, phase 2 can step <b>up</b> as easily as down — that's how node 1 ends up in the answer for target 5.</div>
+      </section>
+      <section class="card">
+        <div class="card-title">Program output</div>
+        <pre id="term"><span class="tc">$ g++ distancek.cpp -o distancek &amp;&amp; ./distancek</span>
+<span id="tl0" class="hidden">Nodes at distance 2 from node 5: 7 4 1</span>
+<span id="tmid" class="hidden tc">$ ./distancek --demo target=3 k=3      # part 2</span>
+<span id="tl1" class="hidden">Nodes at distance 3 from node 3: 7 4</span>
+<span id="twait">▊ waiting for the runs…</span></pre>
+      </section>
+    </aside>
+  </div>
+
+  <section class="card msg-card"><div id="msg"></div></section>
+
+  <section class="card controls">
+    <div class="btns">
+      <button id="bReset" title="Reset (Home)">⏮</button>
+      <button id="bPrev"  title="Step back (←)">⏴ Step</button>
+      <button id="bPlay"  title="Play / Pause (Space)">▶ Play</button>
+      <button id="bNext"  title="Step forward (→)">Step ⏵</button>
+      <button id="bEnd"   title="Jump to end (End)">⏭</button>
+    </div>
+    <input type="range" id="scrub" min="-1" max="1" value="-1" title="Scrub through the trace">
+    <div class="meta">
+      <span id="counter"></span>
+      <label class="spd" title="Playback speed">🐢 <input type="range" id="speed" min="1" max="10" value="6"> 🐇</label>
+    </div>
+  </section>
+
+  <div class="legend">
+    <span><i class="dot cur"></i>current node</span>
+    <span><i class="dot tgt"></i>target</span>
+    <span><i class="dot unr"></i>never reached (distance &gt; k)</span>
+    <span><i class="lnDown"></i>child step ↓</span>
+    <span><i class="lnUp"></i>parent step ↑ (via parentMap)</span>
+    <span>chip d=N = distance from target · ★ = in the answer</span>
+    <span style="color:#64748b">Shortcuts: Space · ←/→ · Home/End</span>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================= tree definition (exact tree from main()) ================= */
+const TREE={
+  nodes:{'3':{l:'5',r:'1'},'5':{l:'6',r:'2'},'1':{l:'0',r:'8'},'6':{l:null,r:null},'2':{l:'7',r:'4'},
+         '0':{l:null,r:null},'8':{l:null,r:null},'7':{l:null,r:null},'4':{l:null,r:null}},
+  ids:['3','5','1','6','2','0','8','7','4'],
+  root:'3',
+  pos:{'3':[410,60],'5':[200,165],'1':[620,165],'6':[95,270],'2':[305,270],'0':[515,270],'8':[725,270],
+       '7':[250,375],'4':[360,375]},
+  vb:'0 0 820 432'
+};
+const DISTCOL=['#fbbf24','#38bdf8','#22c55e','#f472b6','#c084fc','#fb923c'];
+
+/* ================= trace generation (exact order of the C++ code) ================= */
+function buildTrace(target,k){
+  const nodes=TREE.nodes,root=TREE.root;
+  const st=[];
+  /* phase 1: parent map via BFS */
+  st.push({t:'p1-start'});
+  const q=[root],parent={};
+  while(q.length){
+    const id=q.shift();
+    st.push({t:'p1-pop',id:id});
+    const L=nodes[id].l,R=nodes[id].r;
+    if(L!=null){parent[L]=id;q.push(L);st.push({t:'p1-map',id:id,child:L});}
+    if(R!=null){parent[R]=id;q.push(R);st.push({t:'p1-map',id:id,child:R});}
+  }
+  st.push({t:'p1-done'});
+  /* phase 2: BFS from target */
+  st.push({t:'p2-init',target:target,k:k});
+  let qq=[target];const visited=new Set([target]);let level=0;
+  while(qq.length){
+    st.push({t:'p2-level',level:level,count:qq.length});
+    if(level===k){ st.push({t:'p2-stop',level:level}); break; }
+    const size=qq.length,nq=[];
+    for(let i=0;i<size;i++){
+      const id=qq[i];
+      st.push({t:'p2-pop',id:id,level:level});
+      const L=nodes[id].l,R=nodes[id].r,P=parent[id]!=null?parent[id]:null;
+      [[L,'left'],[R,'right'],[P,'parent']].forEach(function(pr){
+        const to=pr[0],dir=pr[1];
+        if(to==null){ st.push({t:'p2-explore',id:id,dir:dir,to:null,result:'null',level:level+1}); }
+        else if(visited.has(to)){ st.push({t:'p2-explore',id:id,dir:dir,to:to,result:'visited',level:level+1}); }
+        else { visited.add(to);nq.push(to);st.push({t:'p2-explore',id:id,dir:dir,to:to,result:'push',level:level+1}); }
+      });
+    }
+    qq=nq;level++;
+  }
+  st.push({t:'p2-collect',ids:qq.slice()});
+  st.push({t:'done'});
+  return st;
+}
+
+/* ================= two-part timeline ================= */
+const PARTS=[
+  {target:'5',k:2, trace:buildTrace('5',2), short:'1 · target 5, k=2 (main)'},
+  {target:'3',k:3, trace:buildTrace('3',3), short:'2 · target 3, k=3'}
+];
+let allSteps=[];
+PARTS.forEach(function(p,i){ if(i>0)allSteps.push({t:'intro',part:i}); p.start=allSteps.length; allSteps=allSteps.concat(p.trace); p.end=allSteps.length-1; });
+const LAST=allSteps.length-1;
+function phaseState(u){
+  if(u<0)return {part:0,local:-1,intro:false};
+  if(u===PARTS[1].start-1)return {part:1,local:-1,intro:true};
+  if(u>=PARTS[1].start)return {part:1,local:u-PARTS[1].start,intro:false};
+  return {part:0,local:u-PARTS[0].start,intro:false};
+}
+
+/* line indices */
+const LK={p1s:9,p1pop:11,p1mapL:13,p1mapR:16,p1done:18,
+          p2init:23,p2lvl:26,p2stop:27,p2pop:29,
+          exL:30,exLp:31,exR:33,exRp:34,exP:36,exPp:37,collect:42,done:43};
+
+/* ================= replay ================= */
+function replay(part,u,partNo){
+  const nodes=TREE.nodes,target=part.target,k=part.k;
+  const parentMap={},p1queue=[],visited=new Set(),dist={},levels={};
+  let p2queue=[],msg='👋 Part '+partNo+': find all nodes at distance '+k+' from node '+target+'. ▶ Play — or Step.',
+      line=-1,edge=null,current=null,banner=false,phase='setup',activeLevel=null,
+      answer=[],lastMapped=null,explored=0;
+  for(let s,i=0;i<=u&&i<part.trace.length;i++){
+    s=part.trace[i];edge=null;
+    if(s.t==='p1-start'){
+      phase='map';p1queue.push(TREE.root);line=LK.p1s;
+      msg='🧭 Phase 1: build parentMap with a BFS from the root (the root itself has no parent)';
+    }else if(s.t==='p1-pop'){
+      p1queue.shift();current=s.id;line=LK.p1pop;
+      msg='📤 BFS visits node '+s.id+' — record the parents of its children';
+    }else if(s.t==='p1-map'){
+      parentMap[s.child]=s.id;p1queue.push(s.child);lastMapped=s.child;line=s.child===nodes[s.id].l?LK.p1mapL:LK.p1mapR;
+      msg='🔗 parentMap['+s.child+'] = '+s.id+' · enqueue '+s.child;
+    }else if(s.t==='p1-done'){
+      phase='map-done';current=null;line=LK.p1done;
+      msg='✅ parentMap complete — every node knows its parent, so phase 2 can move UP too';
+    }else if(s.t==='p2-init'){
+      phase='search';p2queue=[target];visited.add(target);dist[target]=0;levels[0]=[target];
+      current=target;line=LK.p2init;
+      msg='🎯 Phase 2: BFS from target node '+target+' in 3 directions — left, right, and UP via parentMap (k = '+k+')';
+    }else if(s.t==='p2-level'){
+      activeLevel=s.level;line=LK.p2lvl;
+      msg=(s.level===k)
+        ?('🛑 distance '+s.level+' == k → STOP expanding — the queue already holds exactly the answer')
+        :('— distance '+s.level+': process '+s.count+' node'+(s.count>1?'s':'')+' and enqueue their unvisited neighbours (distance '+(s.level+1)+') —');
+    }else if(s.t==='p2-stop'){
+      line=LK.p2stop;
+      msg='🛑 break — nothing beyond distance '+k+' is explored';
+    }else if(s.t==='p2-pop'){
+      p2queue.shift();current=s.id;line=LK.p2pop;explored++;
+      msg='📤 processing node '+s.id+' (distance '+s.level+')';
+    }else if(s.t==='p2-explore'){
+      current=s.id;explored++;
+      const dirWord=s.dir==='parent'?'UP via parentMap':s.dir+' child';
+      if(s.result==='push'){
+        visited.add(s.to);
+        p2queue.push(s.to);dist[s.to]=s.level;if(!levels[s.level])levels[s.level]=[];levels[s.level].push(s.to);
+        edge={a:s.id,b:s.to,dir:s.dir==='parent'?'up':'down'};
+        line=s.dir==='left'?LK.exLp:(s.dir==='right'?LK.exRp:LK.exPp);
+        msg=(s.dir==='parent')
+          ?('⬆️ UP via parentMap: node '+s.id+' → node '+s.to+' (distance '+s.level+')')
+          :('⬇️ '+s.dir+' child '+s.to+' → distance '+s.level);
+      }else if(s.result==='visited'){
+        line=s.dir==='left'?LK.exL:(s.dir==='right'?LK.exR:LK.exP);
+        msg='⏭️ '+dirWord+' leads to node '+s.to+' — already visited, skip';
+      }else{
+        line=s.dir==='left'?LK.exL:(s.dir==='right'?LK.exR:LK.exP);
+        msg='· no '+s.dir+(s.dir==='parent'?' (root has none)':' child');
+      }
+    }else if(s.t==='p2-collect'){
+      answer=s.ids.slice();phase='collect';current=null;line=LK.collect;
+      msg='🏆 collect the queue: nodes at distance '+k+' = ['+answer.join(', ')+']';
+    }else if(s.t==='done'){
+      banner=true;phase='done';current=null;line=LK.done;
+      msg=(partNo===1)
+        ?('🏁 Part 1 complete: ['+answer.join(', ')+'] — 7 and 4 lie below the target, but node 1 was found by climbing UP through parentMap (5 → 3 → 1). Nodes 0 and 8 sit at distance 3 and were never touched.')
+        :('🏁 All done! Part 2: ['+answer.join(', ')+'] — from the root, the wave rolled three levels down; only the deepest leaves 7 and 4 survive at distance 3. Recap: target 5, k=2 → [7, 4, 1] · target 3, k=3 → [7, 4].');
+    }
+  }
+  return {parentMap:parentMap,p1queue:p1queue,p2queue:p2queue,visited:visited,dist:dist,levels:levels,
+          msg:msg,line:line,edge:edge,current:current,banner:banner,phase:phase,activeLevel:activeLevel,
+          answer:answer,lastMapped:lastMapped,target:target,k:k};
+}
+function replayPart(p,u){return replay(p,u,0);}
+const PARTSUMS=PARTS.map(function(p){return replayPart(p,p.trace.length-1);});
+const INTRO_MSG='🎬 Part 1 done: [7, 4, 1] — two nodes below the target, one (node 1) found by climbing UP the parent chain. Now Part 2: target the ROOT with k=3 — the wave spreads purely downward this time.';
+
+/* ================= code panel ================= */
+const CODE=[
+  '<span class="kw">vector</span>&lt;<span class="kw">int</span>&gt; <span class="fn">distanceK</span>(TreeNode* root, TreeNode* target, <span class="kw">int</span> k) {',
+  '    <span class="kw">if</span> (!root) <span class="kw">return</span> {};',
+  '    <span class="kw">unordered_map</span>&lt;TreeNode*, TreeNode*&gt; parentMap;',
+  '    <span class="fn">mapParentNodes</span>(root, parentMap);          <span class="cm">// step 1</span>',
+  '    <span class="kw">return</span> <span class="fn">bfsFromTarget</span>(target, parentMap, k); <span class="cm">// step 2</span>',
+  '}',
+  '',
+  '<span class="kw">void</span> <span class="fn">mapParentNodes</span>(TreeNode* root, <span class="kw">unordered_map</span>&lt;TreeNode*, TreeNode*&gt;&amp; parentMap) {',
+  '    <span class="kw">queue</span>&lt;TreeNode*&gt; q;',
+  '    q.push(root);',
+  '    <span class="kw">while</span> (!q.empty()) {',
+  '        TreeNode* node = q.front(); q.pop();',
+  '        <span class="kw">if</span> (node-&gt;left) {',
+  '            parentMap[node-&gt;left] = node; q.push(node-&gt;left);',
+  '        }',
+  '        <span class="kw">if</span> (node-&gt;right) {',
+  '            parentMap[node-&gt;right] = node; q.push(node-&gt;right);',
+  '        }',
+  '    }',
+  '}',
+  '',
+  '<span class="kw">vector</span>&lt;<span class="kw">int</span>&gt; <span class="fn">bfsFromTarget</span>(TreeNode* target, <span class="kw">unordered_map</span>&lt;...&gt;&amp; parentMap, <span class="kw">int</span> k) {',
+  '    <span class="kw">queue</span>&lt;TreeNode*&gt; q; <span class="kw">unordered_set</span>&lt;TreeNode*&gt; visited;',
+  '    q.push(target); visited.insert(target);',
+  '    <span class="kw">int</span> currentLevel = <span class="nm">0</span>;',
+  '    <span class="kw">while</span> (!q.empty()) {',
+  '        <span class="kw">int</span> size = q.size();',
+  '        <span class="kw">if</span> (currentLevel++ == k) <span class="kw">break</span>;',
+  '        <span class="kw">for</span> (<span class="kw">int</span> i = <span class="nm">0</span>; i &lt; size; ++i) {',
+  '            TreeNode* node = q.front(); q.pop();',
+  '            <span class="kw">if</span> (node-&gt;left &amp;&amp; !visited.count(node-&gt;left)) {',
+  '                visited.insert(node-&gt;left); q.push(node-&gt;left);',
+  '            }',
+  '            <span class="kw">if</span> (node-&gt;right &amp;&amp; !visited.count(node-&gt;right)) {',
+  '                visited.insert(node-&gt;right); q.push(node-&gt;right);',
+  '            }',
+  '            <span class="kw">if</span> (parentMap.count(node) &amp;&amp; !visited.count(parentMap[node])) {',
+  '                visited.insert(parentMap[node]); q.push(parentMap[node]);',
+  '            }',
+  '        }',
+  '    }',
+  '    <span class="kw">vector</span>&lt;<span class="kw">int</span>&gt; result;',
+  '    <span class="kw">while</span> (!q.empty()) { result.push_back(q.front()-&gt;val); q.pop(); }',
+  '    <span class="kw">return</span> result;',
+  '}'];
+
+/* ================= DOM / rendering ================= */
+if(typeof document!=='undefined'){
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('tree');
+function E(tag,attrs,parent){const el=document.createElementNS(NS,tag);for(const k in attrs)el.setAttribute(k,attrs[k]);if(parent)parent.appendChild(el);return el;}
+function marker(defs,id,color){const m=E('marker',{id:id,viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:6.5,markerHeight:6.5,orient:'auto-start-reverse'},defs);E('path',{d:'M0,0L10,5L0,10z',fill:color},m);}
+
+let nodeEls={},aLine=null,gMarks=null;
+function buildSVG(){
+  svg.setAttribute('viewBox',TREE.vb);
+  svg.innerHTML='';
+  nodeEls={};
+  const defs=E('defs',{},svg);
+  marker(defs,'arrDown','#f59e0b');marker(defs,'arrUp','#f472b6');
+  const gE=E('g',{},svg),gA=E('g',{},svg),gN=E('g',{},svg);
+  gMarks=E('g',{},svg);
+  for(const id of TREE.ids){
+    const L=TREE.nodes[id].l,R=TREE.nodes[id].r,p1=TREE.pos[id];
+    [L,R].forEach(function(c){
+      if(c==null)return;
+      const p2=TREE.pos[c];
+      E('line',{x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],class:'edge'},gE);
+    });
+  }
+  aLine=E('line',{class:'aline'},gA);aLine.style.display='none';
+  for(const id of TREE.ids){
+    const p=TREE.pos[id],x=p[0],y=p[1],g=E('g',{},gN);
+    const c=E('circle',{cx:x,cy:y,r:26,class:'node'},g);
+    const t=E('text',{x:x,y:y,class:'nval'},g);t.textContent=id;
+    const dc=E('g',{class:'dchr'},g);dc.style.display='none';
+    E('rect',{x:x-22,y:y+32,width:44,height:20,rx:7},dc);
+    const dt=E('text',{x:x,y:y+45.5},dc);
+    nodeEls[id]={c:c,dc:dc,dt:dt};
+  }
+}
+buildSVG();
+
+const codeBox=document.getElementById('code');
+CODE.forEach(function(h,i){
+  const d=document.createElement('div');d.className='cl';d.id='cl'+i;
+  d.innerHTML='<span class="ln">'+(i+1)+'</span><span class="lt">'+h+'</span>';
+  codeBox.appendChild(d);
+});
+
+const msgEl=document.getElementById('msg'),
+      levelsBox=document.getElementById('levelsBox'),lvlStatsEl=document.getElementById('lvlStats'),
+      qrow=document.getElementById('qrow'),
+      mapBox=document.getElementById('mapBox'),mapStatsEl=document.getElementById('mapStats'),
+      counterEl=document.getElementById('counter'),scrub=document.getElementById('scrub'),
+      bPlay=document.getElementById('bPlay'),tgtBadge=document.getElementById('tgtBadge'),
+      tl0=document.getElementById('tl0'),tl1=document.getElementById('tl1'),
+      tmid=document.getElementById('tmid'),twait=document.getElementById('twait');
+scrub.max=String(LAST);
+
+/* phase tracker */
+const trackEl=document.getElementById('phasetrack'),trackBtns=[];
+PARTS.forEach(function(p,i){
+  const b=document.createElement('button');
+  b.textContent=p.short;
+  b.title='Jump to part '+(i+1);
+  b.onclick=function(){stopPlay();setIdx(p.start);};
+  trackEl.appendChild(b);trackBtns.push(b);
+});
+
+let idx=-1,playing=false,timer=null;
+const delay=()=>1650-Number(document.getElementById('speed').value)*155;
+
+function render(){
+  const ps=phaseState(idx);
+  const part=PARTS[ps.part];
+  let st;
+  if(ps.intro){ st=replayPart(part,-1); st.msg=INTRO_MSG; }
+  else st=replay(part,ps.local,ps.part+1);
+  const target=part.target,k=part.k;
+
+  /* target + answer marks */
+  gMarks.innerHTML='';
+  const tp=TREE.pos[target];
+  E('circle',{cx:tp[0],cy:tp[1],r:33,class:'tring'},gMarks);
+  const tl=E('text',{x:tp[0],y:tp[1]-40,class:'tlbl'},gMarks);
+  tl.textContent='🎯 TARGET';
+  if(st.banner){
+    st.answer.forEach(function(id){
+      const p=TREE.pos[id];
+      const s=E('text',{x:p[0]+30,y:p[1]-28,class:'star'},gMarks);
+      s.textContent='★';
+    });
+  }
+  /* nodes */
+  for(const id of TREE.ids){
+    const el=nodeEls[id];let cl='node';
+    if(st.visited.has(id))cl+=' vis';
+    if(st.current===id)cl+=' current';
+    if(st.banner&&!st.visited.has(id))cl+=' unreached';
+    el.c.setAttribute('class',cl);
+    if(st.visited.has(id)){
+      const d=st.dist[id],col=DISTCOL[Math.min(d,DISTCOL.length-1)];
+      el.dc.style.display='';
+      el.dc.querySelector('rect').setAttribute('stroke',col);
+      el.dc.querySelector('rect').setAttribute('fill',col+'22');
+      el.dt.setAttribute('fill',col);
+      el.dt.textContent='d='+d;
+      if(st.current!==id)el.c.style.stroke=col;
+    }else{
+      el.dc.style.display='none';
+      el.c.style.stroke='';
+    }
+  }
+  if(st.current!=null)nodeEls[st.current].c.style.stroke='';
+  /* active edge */
+  if(st.edge){
+    const p1=TREE.pos[st.edge.a],p2=TREE.pos[st.edge.b];
+    const dx=p2[0]-p1[0],dy=p2[1]-p1[1],len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len;
+    aLine.setAttribute('x1',p1[0]+ux*28);aLine.setAttribute('y1',p1[1]+uy*28);
+    aLine.setAttribute('x2',p2[0]-ux*35);aLine.setAttribute('y2',p2[1]-uy*35);
+    aLine.setAttribute('class','aline '+(st.edge.dir==='down'?'down':'up'));
+    aLine.setAttribute('marker-end',st.edge.dir==='down'?'url(#arrDown)':'url(#arrUp)');
+    aLine.style.display='';
+  } else aLine.style.display='none';
+  /* code highlight */
+  for(let i=0;i<CODE.length;i++)document.getElementById('cl'+i).classList.toggle('hl',st.line===i);
+  /* levels panel */
+  levelsBox.innerHTML='';
+  const searching=st.phase==='search'||st.phase==='collect'||st.phase==='done';
+  if(!searching){
+    levelsBox.innerHTML='<div class="mempty">'+(st.phase==='setup'?'phase 2 hasn’t started yet':'building parentMap first…')+'</div>';
+  }else{
+    const maxLvl=Math.max(k,st.activeLevel||0);
+    for(let l=0;l<=maxLvl;l++){
+      const row=document.createElement('div');
+      const isAns=st.banner&&l===k;
+      row.className='lrow'+(st.activeLevel===l&&!st.banner?' active':'')+(isAns?' ans':'');
+      const ids=st.levels[l]||[];
+      row.innerHTML='<span class="llab">distance '+l+(isAns?' ★':'')+'</span>'+
+        (ids.length?ids.map(function(id){
+          const col=DISTCOL[Math.min(l,DISTCOL.length-1)];
+          return '<span class="lcell" style="border-color:'+col+';color:'+col+';background:'+col+'22">'+id+'</span>';
+        }).join(''):'<span class="lempty">(none yet)</span>');
+      levelsBox.appendChild(row);
+    }
+  }
+  lvlStatsEl.textContent=searching?('visited: '+st.visited.size):('phase: '+(st.phase==='map'?'building parentMap':'setup'));
+  /* queue row */
+  const liveQ=(st.phase==='map')?st.p1queue:((st.phase==='search'||st.phase==='collect')?st.p2queue:[]);
+  qrow.innerHTML='<span class="qlab">queue'+(st.phase==='map'?' (phase 1)':' (phase 2)')+':</span>'+
+    (liveQ.length?liveQ.map(function(id){return '<span class="qcell">'+id+'</span>';}).join(''):'<span class="lempty">empty</span>');
+  /* parent map panel */
+  mapBox.innerHTML='';
+  const pkeys=Object.keys(st.parentMap);
+  if(!pkeys.length){mapBox.innerHTML='<div class="mempty">empty — phase 1 hasn’t mapped anyone yet</div>';}
+  pkeys.forEach(function(child){
+    const row=document.createElement('div');
+    row.className='mrow'+(st.lastMapped===child?' fresh':'');
+    row.innerHTML='<span class="mchild">node '+child+'</span><span class="marrow">→ parent</span><span class="mpar">node '+st.parentMap[child]+'</span>';
+    mapBox.appendChild(row);
+  });
+  mapStatsEl.textContent=pkeys.length+' / '+(TREE.ids.length-1)+' mapped';
+  /* phase tracker + badge */
+  trackBtns.forEach(function(b,i){
+    const done=idx>=PARTS[i].end,active=(ps.part===i);
+    b.className=done?'done':(active?'active':'');
+    b.textContent=PARTS[i].short+(done?' → ['+PARTSUMS[i].answer.join(', ')+']':'');
+  });
+  tgtBadge.textContent='🎯 target '+target+' · k = '+k;
+  /* text bits */
+  msgEl.textContent=st.msg;
+  counterEl.textContent='Step '+(idx+1)+' / '+allSteps.length+' · part '+(ps.part+1)+'/2';
+  scrub.value=String(idx);
+  bPlay.textContent=playing?'⏸ Pause':'▶ Play';
+  tl0.classList.toggle('hidden',idx<PARTS[0].end);
+  tmid.classList.toggle('hidden',idx<PARTS[1].start-1);
+  tl1.classList.toggle('hidden',idx<LAST);
+  twait.classList.toggle('hidden',idx>=PARTS[0].end);
+}
+
+/* ================= controls ================= */
+function setIdx(v){idx=Math.max(-1,Math.min(LAST,v));render();}
+function stopPlay(){if(playing){playing=false;clearTimeout(timer);render();}}
+function play(){if(idx>=LAST)setIdx(-1);playing=true;render();timer=setTimeout(tick,delay());}
+function tick(){if(!playing)return;if(idx>=LAST){stopPlay();return;}setIdx(idx+1);timer=setTimeout(tick,delay());}
+bPlay.onclick=function(){playing?stopPlay():play();};
+document.getElementById('bReset').onclick=function(){stopPlay();setIdx(-1);};
+document.getElementById('bPrev').onclick=function(){stopPlay();setIdx(idx-1);};
+document.getElementById('bNext').onclick=function(){stopPlay();setIdx(idx+1);};
+document.getElementById('bEnd').onclick=function(){stopPlay();setIdx(LAST);};
+scrub.addEventListener('input',function(){stopPlay();setIdx(Number(scrub.value));});
+document.getElementById('speed').addEventListener('input',function(){
+  if(playing){clearTimeout(timer);timer=setTimeout(tick,delay());}
+});
+document.addEventListener('keydown',function(e){
+  if(e.code==='Space'){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='ArrowRight'){e.preventDefault();stopPlay();setIdx(idx+1);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();stopPlay();setIdx(idx-1);}
+  else if(e.key==='Home'){stopPlay();setIdx(-1);}
+  else if(e.key==='End'){stopPlay();setIdx(LAST);}
+});
+render();
+}
+</script>
+</body>
+</html>

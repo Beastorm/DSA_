@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Count Nodes in Complete Binary Tree — Brute Force vs Optimal</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2c; --panel2:#0d1626; --border:#24324d;
+    --text:#e2e8f0; --muted:#94a3b8;
+    --amber:#f59e0b; --green:#22c55e; --red:#ef4444; --sky:#38bdf8; --gold:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 700px at 70% -10%, #16233d 0%, var(--bg) 55%);color:var(--text);
+       font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1240px;margin:0 auto;padding:22px 18px 40px;}
+  header h1{margin:0;font-size:24px;letter-spacing:.2px}
+  header .sub{margin:6px 0 0;color:var(--muted);font-size:14px;max-width:940px}
+  header code,.formula code,.note code{background:#1e293b;border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:12px;color:#fbbf24}
+  .grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(340px,1fr);gap:14px;margin-top:16px}
+  .leftcol{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .side{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 16px;min-width:0}
+  .card-title{font-size:11.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .stats{font-weight:500;letter-spacing:0;text-transform:none;color:#7dd3fc;font-size:12px}
+  svg{width:100%;height:auto;display:block}
+  .ftext{margin-top:8px;color:var(--muted);font-size:13px;text-align:center}
+
+  .phasetrack{display:flex;gap:6px;flex-wrap:wrap}
+  .phasetrack button{padding:4px 10px;font-size:12px;border-radius:8px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted)}
+  .phasetrack button.active{background:var(--amber);border-color:var(--amber);color:#1f2937}
+  .phasetrack button.done{background:#052e16;border-color:#166534;color:#86efac}
+
+  /* ---- SVG ---- */
+  .edge{stroke:#334155;stroke-width:2}
+  .node{fill:#1e293b;stroke:#64748b;stroke-width:2;transition:fill .2s,stroke .2s,opacity .3s}
+  .node.onstack{fill:#0c4a6e;stroke:var(--sky)}
+  .node.current{fill:#7c2d12;stroke:var(--amber);stroke-width:4}
+  .node.counted{fill:#052e16;stroke:var(--green)}
+  .node.perfect{fill:#4a3a06;stroke:var(--gold);stroke-width:3}
+  .nval{fill:#f1f5f9;font-weight:700;font-size:18px;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+  .obadge{stroke-width:1.5}
+  .obtxt{fill:#0b1220;font-size:10.5px;font-weight:800;text-anchor:middle;dominant-baseline:central}
+  .resr rect{fill:#052e16;stroke:var(--green);stroke-width:1.3}
+  .resr text{fill:#bbf7d0;font-size:11.5px;font-weight:700;text-anchor:middle}
+  .resr.goldr rect{fill:#4a3a06;stroke:var(--gold)}
+  .resr.goldr text{fill:#fde68a}
+  .aline{stroke-width:3;fill:none;stroke-dasharray:8 7;animation:flow .55s linear infinite}
+  .aline.down{stroke:var(--amber)}
+  .aline.up{stroke:var(--green)}
+  @keyframes flow{to{stroke-dashoffset:-15}}
+
+  /* ---- data panel ---- */
+  .bignum{font:800 30px ui-monospace,Menlo,monospace;color:var(--gold)}
+  #orderBox{display:flex;flex-wrap:wrap;gap:6px;min-height:36px;align-items:center;margin-top:8px}
+  .oempty{color:var(--muted);font-size:13px;font-style:italic}
+  .ocell{font:700 13px ui-monospace,Menlo,monospace;background:#052e16;border:1px solid var(--green);border-radius:8px;padding:5px 10px;color:#bbf7d0}
+  .ocell.fresh{outline:2px solid var(--amber);outline-offset:1px}
+  .frow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font:600 12.5px ui-monospace,Menlo,monospace;background:#0d1626;border:1px solid var(--border);border-radius:8px;padding:6px 10px;margin-top:6px}
+  .frow.fresh{border-color:var(--gold);box-shadow:0 0 0 1px rgba(251,191,36,.35)}
+  .fnlab{color:#fde68a}
+  .fndet{color:var(--muted)}
+  .fnres{margin-left:auto;color:var(--gold)}
+
+  /* ---- code ---- */
+  #code{font:11.8px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:8px 0;overflow-x:auto}
+  .cl{padding:1px 12px 1px 8px;white-space:pre}
+  .cl .ln{display:inline-block;width:20px;margin-right:12px;text-align:right;color:#475569;user-select:none}
+  .cl.hl{background:rgba(245,158,11,.16);box-shadow:inset 3px 0 0 var(--amber)}
+  .kw{color:#c084fc} .fn{color:#7dd3fc} .nu{color:#fb923c} .nm{color:#4ade80} .cm{color:#64748b;font-style:italic}
+
+  /* ---- stack ---- */
+  #stack{display:flex;flex-direction:column;gap:6px;max-height:265px;overflow-y:auto;padding-right:4px}
+  .empty{color:var(--muted);font-size:13px;font-style:italic;padding:6px 2px}
+  .frame{border:1px solid #334155;border-radius:10px;padding:7px 10px;background:#0f1a2e;font-size:13px;border-left:3px solid var(--sky)}
+  .frame.root-fr{border-left:3px solid var(--gold)}
+  .frame.top{border-color:var(--amber);box-shadow:0 0 0 1px rgba(245,158,11,.25)}
+  .frame.fret{border-color:var(--green)}
+  .ftitle{font:600 12.6px ui-monospace,Menlo,Consolas,monospace;color:#cbd5e1}
+  .toplbl{color:var(--amber);font-size:10.5px;font-family:system-ui;letter-spacing:.04em}
+  .fchips{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center}
+  .chip{font:600 11.5px ui-monospace,Menlo,monospace;background:#1e293b;border:1px solid #334155;color:#94a3b8;border-radius:6px;padding:2px 8px}
+  .chip.on{color:#a7f3d0;border-color:#14532d;background:#052e16}
+  .chip.gold{color:#fde68a;border-color:var(--gold);background:#4a3a06}
+  .chip.live{color:#fde68a;border-color:var(--gold);background:#4a3a06}
+  .res{font:700 11.5px ui-monospace,Menlo,monospace;border-radius:6px;padding:2px 8px;color:#bbf7d0;background:#14532d;border:1px solid #166534}
+
+  /* ---- message + controls ---- */
+  .msg-card{margin-top:14px;font-size:15px;min-height:46px;display:flex;align-items:center;gap:10px}
+  .msg-card::before{content:"💬";font-size:18px}
+  .controls{margin-top:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  .btns{display:flex;gap:8px}
+  button{background:#1e293b;color:var(--text);border:1px solid #334155;border-radius:10px;padding:8px 13px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
+  button:hover{background:#273549;border-color:#4a5c7a}
+  #bPlay{background:var(--amber);border-color:var(--amber);color:#1f2937;min-width:104px}
+  #bPlay:hover{background:#fbbf24}
+  #scrub{flex:1;min-width:200px;accent-color:var(--amber);cursor:pointer}
+  .meta{display:flex;align-items:center;gap:14px;color:var(--muted);font-size:12.5px;white-space:nowrap}
+  .spd{display:flex;align-items:center;gap:6px}
+  .spd input{accent-color:var(--amber);width:90px;cursor:pointer}
+
+  /* ---- terminal + legend ---- */
+  #term{margin:0;font:12.5px/1.75 ui-monospace,Menlo,Consolas,monospace;background:#020617;border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:#86efac}
+  .tc{color:#7dd3fc}
+  #twait{color:#64748b}
+  .hidden{display:none}
+  .legend{margin-top:14px;display:flex;flex-wrap:wrap;gap:16px;color:var(--muted);font-size:12.5px;align-items:center}
+  .legend i{display:inline-block;vertical-align:-2px;margin-right:6px}
+  .dot{width:12px;height:12px;border-radius:50%}
+  .dot.cur{background:#7c2d12;border:2.5px solid var(--amber)}
+  .dot.stk{background:#0c4a6e;border:2px solid var(--sky)}
+  .dot.cnt{background:#052e16;border:2px solid var(--green)}
+  .dot.prf{background:#4a3a06;border:2px solid var(--gold)}
+  .lnDown{width:26px;height:0;border-top:3px dashed var(--amber)}
+  .lnUp{width:26px;height:0;border-top:3px dashed var(--green)}
+  .note{margin-top:10px;color:var(--muted);font-size:12.5px}
+  @media(max-width:960px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🔢 Count Nodes in a Complete Binary Tree — Brute Force vs Optimal</h1>
+    <p class="sub">One guided flow, four parts. The brute force visits <b>every node</b> (O(N)). The optimal approach compares the <b>leftmost</b> and <b>rightmost</b> heights at each node: if they're equal, the subtree is <b>perfect</b> and gets counted instantly by <code>(1 &lt;&lt; h) − 1</code> — <i>without visiting its nodes</i> (O(log²N)).
+       Parts 1–2 use the 6-node tree from <code>main()</code>, parts 3–4 the 9-node example tree. Watch whole subtrees turn gold and get skipped. Just press ▶ Play.</p>
+  </header>
+
+  <div class="grid">
+    <div class="leftcol">
+    <section class="card">
+      <div class="card-title">
+        <span>Tree</span>
+        <span class="phasetrack" id="phasetrack"></span>
+      </div>
+      <svg id="tree" aria-label="binary tree"></svg>
+      <div class="ftext">complete binary tree: every level full except the last (filled left-to-right) · perfect subtree ⇔ leftmost height == rightmost height</div>
+    </section>
+
+    <section class="card">
+      <div class="card-title" id="dataTitle">counter</div>
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <span class="bignum" id="bigNum">0</span>
+        <span style="color:var(--muted);font-size:13px" id="bigLbl">count</span>
+      </div>
+      <div id="orderBox"></div>
+      <div id="formulaBox"></div>
+      <div class="note" id="dataNote">🔢 The counter increments once per visited node — every single node must be touched.</div>
+    </section>
+    </div>
+
+    <aside class="side">
+      <section class="card">
+        <div class="card-title">Code <span class="stats" id="algoTag"></span></div>
+        <div id="code"></div>
+      </section>
+      <section class="card">
+        <div class="card-title">Call stack <span class="stats" id="stats"></span></div>
+        <div id="stack"></div>
+        <div class="note">📏 The optimal version only ever walks the two <b>spines</b> (leftmost &amp; rightmost paths) — gold-filled subtrees were counted by the formula and their nodes never entered the recursion.</div>
+      </section>
+      <section class="card">
+        <div class="card-title">Program output</div>
+        <pre id="term"><span class="tc">$ g++ countnodes.cpp -o countnodes &amp;&amp; ./countnodes</span>
+<span id="tl0" class="hidden"></span>
+<span id="tm1" class="hidden tc"># part 2: optimal approach, same tree</span>
+<span id="tl1" class="hidden"></span>
+<span id="tm2" class="hidden tc"># part 3: brute force on the 9-node example tree</span>
+<span id="tl2" class="hidden"></span>
+<span id="tm3" class="hidden tc"># part 4: optimal approach on the 9-node tree</span>
+<span id="tl3" class="hidden"></span>
+<span id="twait">▊ waiting for the runs…</span></pre>
+      </section>
+    </aside>
+  </div>
+
+  <section class="card msg-card"><div id="msg"></div></section>
+
+  <section class="card controls">
+    <div class="btns">
+      <button id="bReset" title="Reset (Home)">⏮</button>
+      <button id="bPrev"  title="Step back (←)">⏴ Step</button>
+      <button id="bPlay"  title="Play / Pause (Space)">▶ Play</button>
+      <button id="bNext"  title="Step forward (→)">Step ⏵</button>
+      <button id="bEnd"   title="Jump to end (End)">⏭</button>
+    </div>
+    <input type="range" id="scrub" min="-1" max="1" value="-1" title="Scrub through the trace">
+    <div class="meta">
+      <span id="counter"></span>
+      <label class="spd" title="Playback speed">🐢 <input type="range" id="speed" min="1" max="10" value="6"> 🐇</label>
+    </div>
+  </section>
+
+  <div class="legend">
+    <span><i class="dot cur"></i>current call</span>
+    <span><i class="dot stk"></i>on the call stack</span>
+    <span><i class="dot cnt"></i>counted (visited)</span>
+    <span><i class="dot prf"></i>perfect — counted by formula, nodes skipped</span>
+    <span><i class="lnDown"></i>call / spine walk ↓</span>
+    <span><i class="lnUp"></i>return ↑</span>
+    <span style="color:#64748b">Shortcuts: Space · ←/→ · Home/End</span>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================= tree definitions ================= */
+const TREES={
+  A:{ /* 6-node tree from main() */
+    nodes:{'1':{l:'2',r:'3'},'2':{l:'4',r:'5'},'3':{l:'6',r:null},'4':{l:null,r:null},'5':{l:null,r:null},'6':{l:null,r:null}},
+    ids:['1','2','3','4','5','6'],
+    root:'1',
+    pos:{'1':[410,80],'2':[240,210],'3':[580,210],'4':[130,340],'5':[350,340],'6':[470,340]},
+    vb:'0 0 820 412'
+  },
+  B:{ /* 9-node tree from example 2 */
+    nodes:{'2':{l:'4',r:'3'},'4':{l:'5',r:'9'},'3':{l:'8',r:'7'},'5':{l:'1',r:'6'},'9':{l:null,r:null},
+           '8':{l:null,r:null},'7':{l:null,r:null},'1':{l:null,r:null},'6':{l:null,r:null}},
+    ids:['2','4','3','5','9','8','7','1','6'],
+    root:'2',
+    pos:{'2':[410,60],'4':[210,165],'3':[610,165],'5':[110,270],'9':[310,270],'8':[510,270],'7':[710,270],
+         '1':[60,375],'6':[160,375]},
+    vb:'0 0 820 448'
+  }
+};
+function subtreeIds(treeKey,id){
+  const nodes=TREES[treeKey].nodes,out=[];
+  (function w(x){ if(x==null)return; out.push(x); w(nodes[x].l); w(nodes[x].r); })(id);
+  return out;
+}
+
+/* ================= traces ================= */
+function buildTraceBF(treeKey){
+  const td=TREES[treeKey],nodes=td.nodes,st=[];
+  let count=0;
+  st.push({t:'cn-enter'});
+  function IN(id){
+    st.push({t:'in-enter',id:id});
+    if(id==null){ st.push({t:'in-null'}); return; }
+    count++;
+    st.push({t:'in-count',id:id,count:count});
+    st.push({t:'in-left',id:id});
+    IN(nodes[id].l);
+    st.push({t:'in-right',id:id});
+    IN(nodes[id].r);
+    st.push({t:'in-ret',id:id});
+  }
+  IN(td.root);
+  st.push({t:'cn-ret',count:count});
+  st.push({t:'done'});
+  return st;
+}
+
+function buildTraceOPT(treeKey){
+  const td=TREES[treeKey],nodes=td.nodes,st=[];
+  st.push({t:'cn-enter'});
+  function LH(id){const p=[];let n=id;while(n!=null){p.push(n);n=nodes[n].l;}return p;}
+  function RH(id){const p=[];let n=id;while(n!=null){p.push(n);n=nodes[n].r;}return p;}
+  function CN(id){
+    st.push({t:'o-enter',id:id});
+    if(id==null){ st.push({t:'o-null'}); return 0; }
+    const lp=LH(id);
+    lp.forEach(function(at,i){ st.push({t:'lh-step',id:id,at:at,h:i+1}); });
+    st.push({t:'lh-done',id:id,lh:lp.length});
+    const rp=RH(id);
+    rp.forEach(function(at,i){ st.push({t:'rh-step',id:id,at:at,h:i+1}); });
+    st.push({t:'rh-done',id:id,rh:rp.length});
+    st.push({t:'o-check',id:id,lh:lp.length,rh:rp.length});
+    if(lp.length===rp.length){
+      const res=(1<<lp.length)-1;
+      st.push({t:'o-formula',id:id,lh:lp.length,res:res});
+      st.push({t:'o-ret',id:id,res:res});
+      return res;
+    }
+    st.push({t:'o-recl',id:id});
+    const l=CN(nodes[id].l);
+    st.push({t:'o-gotl',id:id,v:l});
+    st.push({t:'o-recr',id:id});
+    const r=CN(nodes[id].r);
+    st.push({t:'o-gotr',id:id,v:r});
+    const res=1+l+r;
+    st.push({t:'o-sum',id:id,l:l,r:r,res:res});
+    st.push({t:'o-ret',id:id,res:res});
+    return res;
+  }
+  CN(td.root);
+  st.push({t:'done'});
+  return st;
+}
+
+/* ================= four-part timeline ================= */
+const PARTS=[
+  {algo:'BF', tree:'A', short:'1 · O(N) · 6-node',    trace:buildTraceBF('A')},
+  {algo:'OPT',tree:'A', short:'2 · O(log²N) · 6-node', trace:buildTraceOPT('A')},
+  {algo:'BF', tree:'B', short:'3 · O(N) · 9-node',    trace:buildTraceBF('B')},
+  {algo:'OPT',tree:'B', short:'4 · O(log²N) · 9-node', trace:buildTraceOPT('B')}
+];
+let allSteps=[];
+PARTS.forEach(function(p,i){ if(i>0)allSteps.push({t:'intro',part:i}); p.start=allSteps.length; allSteps=allSteps.concat(p.trace); p.end=allSteps.length-1; });
+const LAST=allSteps.length-1;
+function phaseState(u){
+  if(u<0)return {part:0,local:-1,intro:false};
+  for(let i=1;i<PARTS.length;i++){ if(u===PARTS[i].start-1)return {part:i,local:-1,intro:true}; }
+  for(let i=PARTS.length-1;i>=0;i--){ if(u>=PARTS[i].start)return {part:i,local:u-PARTS[i].start,intro:false}; }
+  return {part:0,local:u,intro:false};
+}
+function popDone(stack){while(stack.length&&stack[stack.length-1].stage==='ret')stack.pop();}
+
+/* line maps */
+const L_BF={cnE:9,inE:1,inN:1,cnt:2,left:3,right:4,inR:4,cnR:11};
+const L_OPT={cnE:1,oN:1,lhS:13,lhD:14,rhS:19,rhD:20,check:4,formula:5,recl:7,recr:8,sum:8,ret:9};
+
+/* ================= replay: brute force ================= */
+function replayBF(trace,treeKey,u){
+  const td=TREES[treeKey],nodes=td.nodes;
+  const stack=[],order=[],counted=new Set();
+  let count=0,msg='👋 Brute force: visit every node once and count.',line=-1,edge=null,current=null,banner=false,final=null;
+  for(let k=0;k<=u&&k<trace.length;k++){
+    const s=trace[k];edge=null;
+    const topF=()=>stack[stack.length-1];
+    if(s.t==='cn-enter'){
+      stack.push({fn:'CN',stage:'run'});line=L_BF.cnE;
+      msg='📞 countNodes(root): count = 0 → inorder(root, count)';
+    }else if(s.t==='in-enter'){
+      stack.push({fn:'IN',id:s.id,stage:'in'});current=s.id;line=L_BF.inE;
+      msg=(s.id==null)?'📞 inorder(NULL)':'📞 inorder(node '+s.id+') — not NULL';
+    }else if(s.t==='in-null'){
+      const f=topF();f.stage='ret';line=L_BF.inN;
+      msg='↩️ NULL → return';
+    }else if(s.t==='in-count'){
+      count=s.count;counted.add(s.id);order.push(s.id);current=s.id;line=L_BF.cnt;
+      msg='🔢 count++ → '+s.count+' (visiting node '+s.id+')';
+    }else if(s.t==='in-left'){
+      const f=topF();f.stage='left';
+      const c=nodes[s.id].l;
+      edge={a:s.id,b:c==null?'NULL':String(c),dir:'down'};
+      line=L_BF.left;msg='⬇️ recurse into the LEFT subtree';
+    }else if(s.t==='in-right'){
+      popDone(stack);
+      const f=topF();f.stage='right';
+      const c=nodes[s.id].r;current=s.id;
+      edge={a:s.id,b:c==null?'NULL':String(c),dir:'down'};
+      line=L_BF.right;msg='⬇️ recurse into the RIGHT subtree';
+    }else if(s.t==='in-ret'){
+      popDone(stack);
+      const f=topF();f.stage='ret';
+      const parent=stack.length>1?stack[stack.length-2]:null;
+      edge=(parent&&parent.fn==='IN'&&parent.id!=null)?{a:String(s.id),b:String(parent.id),dir:'up'}:null;
+      current=parent&&parent.fn==='IN'?parent.id:null;
+      line=L_BF.inR;msg='↩️ inorder(node '+s.id+') done';
+    }else if(s.t==='cn-ret'){
+      popDone(stack);
+      const f=topF();f.stage='ret';f.res=s.count;final=s.count;
+      line=L_BF.cnR;msg='✅ countNodes returns count = '+s.count;
+    }else if(s.t==='done'){
+      popDone(stack);banner=true;current=null;line=-1;
+      msg='🏁 Brute force complete: '+count+' nodes — every single one was visited ('+order.length+' visits).';
+    }
+  }
+  return {stack:stack,order:order,counted:counted,count:count,msg:msg,line:line,edge:edge,current:current,banner:banner,final:final};
+}
+
+/* ================= replay: optimal ================= */
+function replayOPT(trace,treeKey,u){
+  const td=TREES[treeKey],nodes=td.nodes;
+  const stack=[],formulaAt={},skipSet=new Set(),resolved={};
+  let msg='👋 Optimal: compare spine heights; perfect subtrees are counted by formula.',
+      line=-1,edge=null,current=null,banner=false,final=null,formulas=0,calls=0;
+  for(let k=0;k<=u&&k<trace.length;k++){
+    const s=trace[k];edge=null;
+    const topF=()=>stack[stack.length-1];
+    if(s.t==='cn-enter'){
+      stack.push({fn:'CN',stage:'run'});line=L_OPT.cnE;
+      msg='📞 countNodes(root) — compare leftmost vs rightmost heights';
+    }else if(s.t==='o-enter'){
+      calls++;stack.push({fn:'ON',id:s.id,stage:'in',lh:null,rh:null});current=s.id;line=L_OPT.cnE;
+      msg=(s.id==null)?'📞 countNodes(NULL)':'📞 countNodes(node '+s.id+')';
+    }else if(s.t==='o-null'){
+      const f=topF();f.stage='ret';f.res=0;line=L_OPT.oN;
+      msg='↩️ NULL → 0 nodes';
+    }else if(s.t==='lh-step'){
+      current=s.at;edge={a:s.id,b:s.at,dir:'down'};
+      line=L_OPT.lhS;
+      msg='⬇️ leftmost walk: node '+s.at+' → lh = '+s.h;
+    }else if(s.t==='lh-done'){
+      const f=topF();f.lh=s.lh;current=s.id;line=L_OPT.lhD;
+      msg='📏 lh(node '+s.id+') = '+s.lh;
+    }else if(s.t==='rh-step'){
+      current=s.at;edge={a:s.id,b:s.at,dir:'down'};
+      line=L_OPT.rhS;
+      msg='⬇️ rightmost walk: node '+s.at+' → rh = '+s.h;
+    }else if(s.t==='rh-done'){
+      const f=topF();f.rh=s.rh;current=s.id;line=L_OPT.rhD;
+      msg='📏 rh(node '+s.id+') = '+s.rh;
+    }else if(s.t==='o-check'){
+      const f=topF();f.stage='chk';current=s.id;line=L_OPT.check;
+      msg=(s.lh===s.rh)
+        ?('✨ lh == rh == '+s.lh+' → the subtree at node '+s.id+' is PERFECT!')
+        :('lh '+s.lh+' ≠ rh '+s.rh+' → not perfect → must recurse into both subtrees');
+    }else if(s.t==='o-formula'){
+      const f=topF();f.stage='formula';formulas++;
+      formulaAt[s.id]=s.res;
+      subtreeIds(treeKey,s.id).forEach(function(x){skipSet.add(x);});
+      current=s.id;line=L_OPT.formula;
+      msg='⚡ return (1 << '+s.lh+') − 1 = '+s.res+' — the whole subtree is counted WITHOUT visiting its nodes!';
+    }else if(s.t==='o-recl'){
+      const f=topF();f.stage='recl';
+      const c=nodes[s.id].l;
+      edge={a:s.id,b:c==null?'NULL':String(c),dir:'down'};
+      line=L_OPT.recl;msg='⬇️ recurse: countNodes(left of '+s.id+')';
+    }else if(s.t==='o-gotl'){
+      popDone(stack);
+      const f=topF();f.left=s.v;f.stage='gotl';current=s.id;
+      const c=nodes[f.id].l;
+      edge={a:c==null?'NULL':String(c),b:String(f.id),dir:'up'};
+      line=L_OPT.recl;msg='⬆️ left subtree of '+f.id+' has '+s.v+' node'+(s.v===1?'':'s');
+    }else if(s.t==='o-recr'){
+      const f=topF();f.stage='recr';
+      const c=nodes[s.id].r;
+      edge={a:s.id,b:c==null?'NULL':String(c),dir:'down'};
+      line=L_OPT.recr;msg='⬇️ recurse: countNodes(right of '+s.id+')';
+    }else if(s.t==='o-gotr'){
+      popDone(stack);
+      const f=topF();f.right=s.v;f.stage='gotr';current=s.id;
+      const c=nodes[f.id].r;
+      edge={a:c==null?'NULL':String(c),b:String(f.id),dir:'up'};
+      line=L_OPT.recr;msg='⬆️ right subtree of '+f.id+' has '+s.v+' node'+(s.v===1?'':'s');
+    }else if(s.t==='o-sum'){
+      const f=topF();f.stage='sum';current=s.id;line=L_OPT.sum;
+      msg='🧮 node '+s.id+': 1 + '+s.l+' + '+s.r+' = '+s.res;
+    }else if(s.t==='o-ret'){
+      const f=topF();f.stage='ret';f.res=s.res;
+      resolved[s.id]=s.res;
+      const parent=stack.length>1?stack[stack.length-2]:null;
+      edge=(parent&&parent.fn==='ON'&&parent.id!=null)?{a:String(s.id),b:String(parent.id),dir:'up'}:null;
+      current=parent&&parent.fn==='ON'?parent.id:null;
+      line=L_OPT.ret;msg='↩️ countNodes(node '+s.id+') = '+s.res;
+      if(parent&&parent.fn==='CN')final=s.res;
+    }else if(s.t==='done'){
+      popDone(stack);banner=true;current=null;line=-1;
+      msg='🏁 Optimal complete: '+resolved[td.root]+' nodes with only '+calls+' countNodes calls and '+formulas+' formula shortcut'+(formulas===1?'':'s')+' — skipped subtrees never entered the recursion.';
+    }
+  }
+  return {stack:stack,formulaAt:formulaAt,skipSet:skipSet,resolved:resolved,msg:msg,line:line,edge:edge,
+          current:current,banner:banner,final:final,formulas:formulas,calls:calls};
+}
+
+function replayPart(p,u){return p.algo==='BF'?replayBF(p.trace,p.tree,u):replayOPT(p.trace,p.tree,u);}
+const PARTSUMS=PARTS.map(function(p){return replayPart(p,p.trace.length-1);});
+
+const INTROS=[null,
+  '🎬 Part 1 done: brute force visited all '+PARTSUMS[0].count+' nodes one by one. Now the SAME tree with the optimal approach — watch it skip whole subtrees with the (1 << h) − 1 formula.',
+  '📊 Same tree: brute force visited '+PARTSUMS[0].count+' nodes; optimal needed only '+PARTSUMS[1].calls+' countNodes calls ('+PARTSUMS[1].formulas+' formula shortcuts). Now Part 3: the 9-node example tree, brute force first.',
+  '🎬 Brute force again visited every one of the '+PARTSUMS[2].count+' nodes. Now the optimal approach on the same tree — three perfect subtrees will be skipped wholesale.'];
+const FINAL_MSG='🏁 Complete! 6-node tree: '+PARTSUMS[0].count+' visits (brute) vs '+PARTSUMS[1].calls+' calls + '+PARTSUMS[1].formulas+' formulas (optimal) · 9-node tree: '+PARTSUMS[2].count+' visits vs '+PARTSUMS[3].calls+' calls + '+PARTSUMS[3].formulas+' formulas. The more perfect the tree, the bigger the win — a perfect 15-node tree would be answered at the ROOT with a single formula.';
+
+/* ================= code panels ================= */
+const CODES={
+BF:[
+  '<span class="kw">void</span> <span class="fn">inorder</span>(TreeNode* root, <span class="kw">int</span>&amp; count) {',
+  '    <span class="kw">if</span> (root == <span class="nu">NULL</span>) <span class="kw">return</span>;',
+  '    count++;',
+  '    <span class="fn">inorder</span>(root-&gt;left, count);',
+  '    <span class="fn">inorder</span>(root-&gt;right, count);',
+  '}',
+  '',
+  '<span class="kw">int</span> <span class="fn">countNodes</span>(TreeNode* root) {',
+  '    <span class="kw">if</span> (root == <span class="nu">NULL</span>) <span class="kw">return</span> <span class="nm">0</span>;',
+  '    <span class="kw">int</span> count = <span class="nm">0</span>;',
+  '    <span class="fn">inorder</span>(root, count);',
+  '    <span class="kw">return</span> count;',
+  '}'],
+OPT:[
+  '<span class="kw">int</span> <span class="fn">countNodes</span>(TreeNode* root) {',
+  '    <span class="kw">if</span> (root == <span class="nu">NULL</span>) <span class="kw">return</span> <span class="nm">0</span>;',
+  '    <span class="kw">int</span> lh = <span class="fn">findHeightLeft</span>(root);',
+  '    <span class="kw">int</span> rh = <span class="fn">findHeightRight</span>(root);',
+  '    <span class="kw">if</span> (lh == rh) {',
+  '        <span class="kw">return</span> (<span class="nm">1</span> &lt;&lt; lh) - <span class="nm">1</span>;   <span class="cm">// perfect!</span>',
+  '    }',
+  '    <span class="kw">return</span> <span class="nm">1</span> + <span class="fn">countNodes</span>(root-&gt;left)',
+  '             + <span class="fn">countNodes</span>(root-&gt;right);',
+  '}',
+  '',
+  '<span class="kw">int</span> <span class="fn">findHeightLeft</span>(TreeNode* node) {',
+  '    <span class="kw">int</span> height = <span class="nm">0</span>;',
+  '    <span class="kw">while</span> (node) { height++; node = node-&gt;left; }',
+  '    <span class="kw">return</span> height;',
+  '}',
+  '',
+  '<span class="kw">int</span> <span class="fn">findHeightRight</span>(TreeNode* node) {',
+  '    <span class="kw">int</span> height = <span class="nm">0</span>;',
+  '    <span class="kw">while</span> (node) { height++; node = node-&gt;right; }',
+  '    <span class="kw">return</span> height;',
+  '}']};
+
+/* ================= DOM / rendering ================= */
+if(typeof document!=='undefined'){
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('tree');
+function E(tag,attrs,parent){const el=document.createElementNS(NS,tag);for(const k in attrs)el.setAttribute(k,attrs[k]);if(parent)parent.appendChild(el);return el;}
+function marker(defs,id,color){const m=E('marker',{id:id,viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:6.5,markerHeight:6.5,orient:'auto-start-reverse'},defs);E('path',{d:'M0,0L10,5L0,10z',fill:color},m);}
+
+let nodeEls={},aLine=null,renderedTree=null,renderedAlgo=null;
+function buildSVG(treeKey){
+  const td=TREES[treeKey];
+  svg.setAttribute('viewBox',td.vb);
+  svg.innerHTML='';
+  nodeEls={};
+  const defs=E('defs',{},svg);
+  marker(defs,'arrDown','#f59e0b');marker(defs,'arrUp','#22c55e');
+  const gE=E('g',{},svg),gA=E('g',{},svg),gN=E('g',{},svg);
+  for(const id of td.ids){
+    const L=td.nodes[id].l,R=td.nodes[id].r,p1=td.pos[id];
+    [L,R].forEach(function(c){
+      if(c==null)return;
+      const p2=td.pos[c];
+      E('line',{x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],class:'edge'},gE);
+    });
+  }
+  aLine=E('line',{class:'aline'},gA);aLine.style.display='none';
+  for(const id of td.ids){
+    const p=td.pos[id],x=p[0],y=p[1],g=E('g',{},gN);
+    const c=E('circle',{cx:x,cy:y,r:26,class:'node'},g);
+    const t=E('text',{x:x,y:y,class:'nval'},g);t.textContent=id;
+    const ob=E('g',{},g);ob.style.display='none';
+    E('circle',{cx:x+26,cy:y-26,r:11,class:'obadge'},ob);
+    const ot=E('text',{x:x+26,y:y-26,class:'obtxt'},ob);
+    const rr=E('g',{class:'resr'},g);rr.style.display='none';
+    E('rect',{x:x-24,y:y+33,width:48,height:20,rx:7},rr);
+    const rt=E('text',{x:x,y:y+46.5},rr);
+    nodeEls[id]={c:c,ob:ob,ot:ot,rr:rr,rt:rt};
+  }
+  renderedTree=treeKey;
+}
+
+const codeBox=document.getElementById('code'),algoTag=document.getElementById('algoTag');
+let curCode=[];
+function buildCode(algo){
+  curCode=CODES[algo];
+  codeBox.innerHTML='';
+  curCode.forEach(function(h,i){
+    const d=document.createElement('div');d.className='cl';d.id='cl'+i;
+    d.innerHTML='<span class="ln">'+(i+1)+'</span><span class="lt">'+h+'</span>';
+    codeBox.appendChild(d);
+  });
+  renderedAlgo=algo;
+  algoTag.textContent=algo==='BF'?'🐢 brute force · O(N)':'⚡ optimal · O(log²N)';
+  algoTag.style.color=algo==='BF'?'#fbbf24':'#86efac';
+}
+
+const msgEl=document.getElementById('msg'),stackEl=document.getElementById('stack'),
+      statsEl=document.getElementById('stats'),counterEl=document.getElementById('counter'),
+      scrub=document.getElementById('scrub'),bPlay=document.getElementById('bPlay'),
+      dataTitle=document.getElementById('dataTitle'),bigNum=document.getElementById('bigNum'),
+      bigLbl=document.getElementById('bigLbl'),orderBox=document.getElementById('orderBox'),
+      formulaBox=document.getElementById('formulaBox'),dataNote=document.getElementById('dataNote'),
+      tl0=document.getElementById('tl0'),tl1=document.getElementById('tl1'),
+      tl2=document.getElementById('tl2'),tl3=document.getElementById('tl3'),
+      tm1=document.getElementById('tm1'),tm2=document.getElementById('tm2'),tm3=document.getElementById('tm3'),
+      twait=document.getElementById('twait');
+scrub.max=String(LAST);
+tl0.textContent='Total nodes: '+PARTSUMS[0].count;
+tl1.textContent='Total nodes: '+PARTSUMS[1].final+'   ['+PARTSUMS[1].formulas+' formula shortcuts, '+PARTSUMS[1].calls+' calls]';
+tl2.textContent='Total nodes: '+PARTSUMS[2].count;
+tl3.textContent='Total nodes: '+PARTSUMS[3].final+'   ['+PARTSUMS[3].formulas+' formula shortcuts, '+PARTSUMS[3].calls+' calls]';
+
+/* phase tracker */
+const trackEl=document.getElementById('phasetrack'),trackBtns=[];
+PARTS.forEach(function(p,i){
+  const b=document.createElement('button');
+  b.textContent=p.short;
+  b.title='Jump to part '+(i+1);
+  b.onclick=function(){stopPlay();setIdx(p.start);};
+  trackEl.appendChild(b);trackBtns.push(b);
+});
+
+let idx=-1,playing=false,timer=null;
+const delay=()=>1650-Number(document.getElementById('speed').value)*155;
+
+function render(){
+  const ps=phaseState(idx);
+  const part=PARTS[ps.part];
+  if(part.tree!==renderedTree)buildSVG(part.tree);
+  if(part.algo!==renderedAlgo)buildCode(part.algo);
+  const td=TREES[part.tree];
+  let st;
+  if(ps.intro){ st=replayPart(part,-1); st.msg=INTROS[ps.part]; }
+  else st=replay(part,ps.local);
+  if(idx===LAST)st.msg=FINAL_MSG;
+
+  /* nodes */
+  const inStack=new Set(st.stack.filter(f=>f.id!=null).map(f=>String(f.id)));
+  for(const id of td.ids){
+    const el=nodeEls[id];let cl='node';
+    if(part.algo==='BF'){
+      if(st.counted.has(id))cl+=' counted';
+      if(inStack.has(id)&&st.current!==id)cl+=' onstack';
+      if(st.current===id)cl+=' current';
+    }else{
+      if(st.skipSet.has(id))cl+=' perfect';
+      else if(inStack.has(id)&&st.current!==id)cl+=' onstack';
+      if(st.current===id)cl+=' current';
+    }
+    el.c.setAttribute('class',cl);
+    if(part.algo==='BF'&&st.order.includes(id)){
+      el.ob.style.display='';
+      el.ob.querySelector('circle').setAttribute('fill','#22c55e');
+      el.ob.querySelector('circle').setAttribute('stroke','#0b1220');
+      el.ot.textContent=st.order.indexOf(id)+1;
+    } else el.ob.style.display='none';
+    if(part.algo==='OPT'&&st.resolved[id]!=null){
+      el.rr.style.display='';
+      el.rr.setAttribute('class','resr'+(st.formulaAt[id]!=null?' goldr':''));
+      el.rt.textContent='= '+st.resolved[id]+(st.formulaAt[id]!=null?' ⚡':'');
+    } else el.rr.style.display='none';
+  }
+  /* active edge */
+  if(st.edge&&st.edge.a!=='NULL'&&st.edge.b!=='NULL'){
+    const p1=td.pos[st.edge.a],p2=td.pos[st.edge.b];
+    const dx=p2[0]-p1[0],dy=p2[1]-p1[1],len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len;
+    aLine.setAttribute('x1',p1[0]+ux*28);aLine.setAttribute('y1',p1[1]+uy*28);
+    aLine.setAttribute('x2',p2[0]-ux*35);aLine.setAttribute('y2',p2[1]-uy*35);
+    aLine.setAttribute('class','aline '+(st.edge.dir==='down'?'down':'up'));
+    aLine.setAttribute('marker-end',st.edge.dir==='down'?'url(#arrDown)':'url(#arrUp)');
+    aLine.style.display='';
+  } else aLine.style.display='none';
+  /* code highlight */
+  for(let i=0;i<curCode.length;i++)document.getElementById('cl'+i).classList.toggle('hl',st.line===i);
+  /* data panel */
+  if(part.algo==='BF'){
+    dataTitle.textContent='counter';
+    bigNum.textContent=String(st.count);
+    bigLbl.textContent='count';
+    dataNote.innerHTML='🔢 The counter increments once per visited node — every single node must be touched (O(N)).';
+    orderBox.innerHTML='';
+    if(!st.order.length){orderBox.innerHTML='<span class="oempty">no nodes visited yet…</span>';}
+    st.order.forEach(function(id,i){
+      const s=document.createElement('span');
+      s.className='ocell'+(i===st.order.length-1?' fresh':'');
+      s.textContent=(i+1)+': '+id;
+      orderBox.appendChild(s);
+    });
+    formulaBox.innerHTML='';
+  }else{
+    dataTitle.textContent='formula shortcuts';
+    bigNum.textContent=st.final!=null?String(st.final):'…';
+    bigLbl.textContent='total nodes';
+    dataNote.innerHTML='⚡ When <code>lh == rh</code>, the subtree is perfect: <code>(1 &lt;&lt; h) − 1</code> nodes counted in O(1) — its nodes are never visited.';
+    orderBox.innerHTML='';
+    formulaBox.innerHTML='';
+    const fkeys=Object.keys(st.formulaAt);
+    if(!fkeys.length){formulaBox.innerHTML='<div class="oempty" style="margin-top:6px">no shortcuts yet…</div>';}
+    fkeys.forEach(function(id){
+      const row=document.createElement('div');
+      row.className='frow fresh';
+      const h=Math.log2(st.formulaAt[id]+1);
+      row.innerHTML='<span class="fnlab">node '+id+' ⚡</span><span class="fndet">lh = rh = '+h+' → 2^'+h+' − 1</span><span class="fnres">'+st.formulaAt[id]+' nodes skipped</span>';
+      formulaBox.appendChild(row);
+    });
+  }
+  /* stack */
+  stackEl.innerHTML='';
+  if(!st.stack.length){
+    stackEl.innerHTML='<div class="empty">'+(st.banner?'all frames returned — the stack is empty again':'the stack is empty — nothing running yet')+'</div>';
+  }
+  st.stack.forEach(function(f,i){
+    const d=document.createElement('div');
+    const isTop=i===st.stack.length-1;
+    d.className='frame'+(f.fn==='CN'?' root-fr':'')+(isTop?' top':'')+(f.stage==='ret'?' fret':'');
+    let chips='';
+    if(f.fn==='CN'){
+      chips=part.algo==='BF'
+        ?'<span class="chip live">count = '+st.count+'</span>'
+        :'<span class="chip live">waiting for countNodes(root)…</span>';
+      if(f.res!=null)chips='<span class="res">returns '+f.res+'</span>';
+    }else{
+      if(part.algo==='BF'){
+        chips='<span class="chip on">count = '+st.count+'</span>';
+      }else{
+        if(f.lh!=null)chips+='<span class="chip on">lh = '+f.lh+'</span>';
+        if(f.rh!=null)chips+='<span class="chip on">rh = '+f.rh+'</span>';
+        if(f.stage==='formula')chips+='<span class="chip gold">perfect → 2^'+f.lh+'−1 = '+f.res+'</span>';
+        if(f.left!=null)chips+='<span class="chip">left = '+f.left+'</span>';
+        if(f.right!=null)chips+='<span class="chip">right = '+f.right+'</span>';
+        if(f.stage==='ret')chips+='<span class="res">returns '+f.res+'</span>';
+      }
+    }
+    const title=f.fn==='CN'?'countNodes(root)':(f.id!=null?(part.algo==='BF'?'inorder(node '+f.id+')':'countNodes(node '+f.id+')'):(part.algo==='BF'?'inorder(NULL)':'countNodes(NULL)'));
+    d.innerHTML='<div class="ftitle">'+(f.fn==='CN'?'🔢':'🌳')+' '+title+(isTop?' <span class="toplbl">◂ top</span>':'')+'</div>'+
+                (chips?'<div class="fchips">'+chips+'</div>':'');
+    stackEl.appendChild(d);
+  });
+  /* phase tracker */
+  trackBtns.forEach(function(b,i){
+    const done=idx>=PARTS[i].end,active=(ps.part===i);
+    b.className=done?'done':(active?'active':'');
+    b.textContent=PARTS[i].short+(done?' → '+PARTSUMS[i].final:'');
+  });
+  /* text bits */
+  msgEl.textContent=st.msg;
+  statsEl.textContent=part.algo==='BF'?('visits: '+st.order.length):('calls: '+st.calls+' · formulas: '+st.formulas);
+  counterEl.textContent='Step '+(idx+1)+' / '+allSteps.length+' · part '+(ps.part+1)+'/4';
+  scrub.value=String(idx);
+  bPlay.textContent=playing?'⏸ Pause':'▶ Play';
+  tl0.classList.toggle('hidden',idx<PARTS[0].end);
+  tm1.classList.toggle('hidden',idx<PARTS[1].start-1);
+  tl1.classList.toggle('hidden',idx<PARTS[1].end);
+  tm2.classList.toggle('hidden',idx<PARTS[2].start-1);
+  tl2.classList.toggle('hidden',idx<PARTS[2].end);
+  tm3.classList.toggle('hidden',idx<PARTS[3].start-1);
+  tl3.classList.toggle('hidden',idx<LAST);
+  twait.classList.toggle('hidden',idx>=PARTS[0].end);
+}
+
+/* ================= controls ================= */
+function setIdx(v){idx=Math.max(-1,Math.min(LAST,v));render();}
+function stopPlay(){if(playing){playing=false;clearTimeout(timer);render();}}
+function play(){if(idx>=LAST)setIdx(-1);playing=true;render();timer=setTimeout(tick,delay());}
+function tick(){if(!playing)return;if(idx>=LAST){stopPlay();return;}setIdx(idx+1);timer=setTimeout(tick,delay());}
+bPlay.onclick=function(){playing?stopPlay():play();};
+document.getElementById('bReset').onclick=function(){stopPlay();setIdx(-1);};
+document.getElementById('bPrev').onclick=function(){stopPlay();setIdx(idx-1);};
+document.getElementById('bNext').onclick=function(){stopPlay();setIdx(idx+1);};
+document.getElementById('bEnd').onclick=function(){stopPlay();setIdx(LAST);};
+scrub.addEventListener('input',function(){stopPlay();setIdx(Number(scrub.value));});
+document.getElementById('speed').addEventListener('input',function(){
+  if(playing){clearTimeout(timer);timer=setTimeout(tick,delay());}
+});
+document.addEventListener('keydown',function(e){
+  if(e.code==='Space'){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='ArrowRight'){e.preventDefault();stopPlay();setIdx(idx+1);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();stopPlay();setIdx(idx-1);}
+  else if(e.key==='Home'){stopPlay();setIdx(-1);}
+  else if(e.key==='End'){stopPlay();setIdx(LAST);}
+});
+render();
+}
+</script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f"}' crossorigin="anonymous"></script>
+</body>
+</html>

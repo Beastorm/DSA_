@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Root-to-Node Path — Backtracking Visualizer</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2c; --panel2:#0d1626; --border:#24324d;
+    --text:#e2e8f0; --muted:#94a3b8;
+    --amber:#f59e0b; --green:#22c55e; --red:#ef4444; --sky:#38bdf8; --pink:#f472b6; --gold:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 700px at 70% -10%, #16233d 0%, var(--bg) 55%);color:var(--text);
+       font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1240px;margin:0 auto;padding:22px 18px 40px;}
+  header h1{margin:0;font-size:24px;letter-spacing:.2px}
+  header .sub{margin:6px 0 0;color:var(--muted);font-size:14px;max-width:930px}
+  header code,.formula code,.note code{background:#1e293b;border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:12px;color:#fbbf24}
+  .grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(340px,1fr);gap:14px;margin-top:16px}
+  .leftcol{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .side{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 16px;min-width:0}
+  .card-title{font-size:11.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .stats{font-weight:500;letter-spacing:0;text-transform:none;color:#7dd3fc;font-size:12px}
+  .targetbadge{font:700 12px ui-monospace,Menlo,monospace;color:#fde68a;background:#4a3a06;border:1px solid var(--gold);border-radius:7px;padding:3px 9px;letter-spacing:0;text-transform:none}
+  svg{width:100%;height:auto;display:block}
+  .formula{margin-top:8px;color:var(--muted);font-size:13px;text-align:center}
+
+  .phasetrack{display:flex;gap:6px;flex-wrap:wrap}
+  .phasetrack button{padding:4px 10px;font-size:12px;border-radius:8px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted)}
+  .phasetrack button.active{background:var(--amber);border-color:var(--amber);color:#1f2937}
+  .phasetrack button.done{background:#052e16;border-color:#166534;color:#86efac}
+
+  /* ---- SVG tree ---- */
+  .edge{stroke:#334155;stroke-width:2}
+  .ppath{stroke:var(--pink);stroke-width:5.5;stroke-linecap:round;opacity:.85}
+  .node{fill:#1e293b;stroke:#64748b;stroke-width:2;transition:fill .2s,stroke .2s,opacity .3s}
+  .node.onstack{fill:#0c4a6e;stroke:var(--sky)}
+  .node.onpath{stroke:var(--pink);stroke-width:3}
+  .node.current{fill:#7c2d12;stroke:var(--amber);stroke-width:4}
+  .node.dead{opacity:.45}
+  .node.found{stroke:var(--gold);stroke-width:4}
+  .nval{fill:#f1f5f9;font-weight:700;font-size:19px;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+  .tring{fill:none;stroke:var(--gold);stroke-width:2;stroke-dasharray:5 4}
+  .tstar{fill:var(--gold);font-size:13px;font-weight:700;text-anchor:middle}
+  .aline{stroke-width:3;fill:none;stroke-dasharray:8 7;animation:flow .55s linear infinite}
+  .aline.down{stroke:var(--amber)}
+  .aline.up{stroke:var(--green)}
+  @keyframes flow{to{stroke-dashoffset:-15}}
+
+  /* ---- path (arr) panel ---- */
+  #pathBox{display:flex;flex-wrap:wrap;gap:6px;min-height:40px;align-items:center}
+  .pempty{color:var(--muted);font-size:13px;font-style:italic}
+  .pcell{font:700 13.5px ui-monospace,Menlo,monospace;background:#4a044e;border:1px solid var(--pink);border-radius:8px;padding:6px 11px;color:#fbcfe8}
+  .pcell.fresh{outline:2px solid var(--amber);outline-offset:1px}
+  .parrow{color:var(--pink);font-weight:700}
+
+  /* ---- code ---- */
+  #code{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:8px 0;overflow-x:auto}
+  .cl{padding:1.5px 12px 1.5px 8px;white-space:pre}
+  .cl .ln{display:inline-block;width:20px;margin-right:12px;text-align:right;color:#475569;user-select:none}
+  .cl.hl{background:rgba(245,158,11,.16);box-shadow:inset 3px 0 0 var(--amber)}
+  .kw{color:#c084fc} .fn{color:#7dd3fc} .nu{color:#fb923c} .nm{color:#4ade80} .cm{color:#64748b;font-style:italic}
+
+  /* ---- stack ---- */
+  #stack{display:flex;flex-direction:column;gap:6px;max-height:265px;overflow-y:auto;padding-right:4px}
+  .empty{color:var(--muted);font-size:13px;font-style:italic;padding:6px 2px}
+  .frame{border:1px solid #334155;border-radius:10px;padding:7px 10px;background:#0f1a2e;font-size:13px}
+  .frame.sv{border-left:3px solid var(--pink)}
+  .frame.gp{border-left:3px solid var(--sky)}
+  .frame.top{border-color:var(--amber);box-shadow:0 0 0 1px rgba(245,158,11,.25)}
+  .frame.fret{border-color:var(--green)}
+  .frame.fret.badret{border-color:var(--red)}
+  .ftitle{font:600 12.6px ui-monospace,Menlo,Consolas,monospace;color:#cbd5e1}
+  .toplbl{color:var(--amber);font-size:10.5px;font-family:system-ui;letter-spacing:.04em}
+  .fchips{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center}
+  .chip{font:600 11.5px ui-monospace,Menlo,monospace;background:#1e293b;border:1px solid #334155;color:#64748b;border-radius:6px;padding:2px 8px}
+  .chip.on{color:#a7f3d0;border-color:#14532d;background:#052e16}
+  .chip.bad{color:#fecaca;border-color:#7f1d1d;background:#450a0a}
+  .chip.live{color:#fbcfe8;border-color:var(--pink);background:#4a044e}
+  .res{font:700 11.5px ui-monospace,Menlo,monospace;border-radius:6px;padding:2px 8px}
+  .res.ok{color:#bbf7d0;background:#14532d;border:1px solid #166534}
+  .res.bad{color:#fecaca;background:#7f1d1d;border:1px solid #ef4444}
+
+  /* ---- message + controls ---- */
+  .msg-card{margin-top:14px;font-size:15px;min-height:46px;display:flex;align-items:center;gap:10px}
+  .msg-card::before{content:"💬";font-size:18px}
+  .controls{margin-top:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  .btns{display:flex;gap:8px}
+  button{background:#1e293b;color:var(--text);border:1px solid #334155;border-radius:10px;padding:8px 13px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
+  button:hover{background:#273549;border-color:#4a5c7a}
+  #bPlay{background:var(--amber);border-color:var(--amber);color:#1f2937;min-width:104px}
+  #bPlay:hover{background:#fbbf24}
+  #scrub{flex:1;min-width:200px;accent-color:var(--amber);cursor:pointer}
+  .meta{display:flex;align-items:center;gap:14px;color:var(--muted);font-size:12.5px;white-space:nowrap}
+  .spd{display:flex;align-items:center;gap:6px}
+  .spd input{accent-color:var(--amber);width:90px;cursor:pointer}
+
+  /* ---- terminal + legend ---- */
+  #term{margin:0;font:12.5px/1.75 ui-monospace,Menlo,Consolas,monospace;background:#020617;border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:#86efac}
+  .tc{color:#7dd3fc}
+  .tline.badline{color:#fca5a5}
+  #twait{color:#64748b}
+  .hidden{display:none}
+  .legend{margin-top:14px;display:flex;flex-wrap:wrap;gap:16px;color:var(--muted);font-size:12.5px;align-items:center}
+  .legend i{display:inline-block;vertical-align:-2px;margin-right:6px}
+  .dot{width:12px;height:12px;border-radius:50%}
+  .dot.cur{background:#7c2d12;border:2.5px solid var(--amber)}
+  .dot.stk{background:#0c4a6e;border:2px solid var(--sky)}
+  .dot.pth{background:#1e293b;border:2.5px solid var(--pink)}
+  .dot.ded{background:#1e293b;border:2px solid #64748b;opacity:.45}
+  .dot.tgt{background:#1e293b;border:2px dashed var(--gold)}
+  .lnBest{width:26px;height:0;border-top:5px solid var(--pink);border-radius:3px}
+  .lnDown{width:26px;height:0;border-top:3px dashed var(--amber)}
+  .lnUp{width:26px;height:0;border-top:3px dashed var(--green)}
+  .note{margin-top:10px;color:var(--muted);font-size:12.5px}
+  @media(max-width:960px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🧭 Root-to-Node Path — Backtracking Visualizer</h1>
+    <p class="sub">One guided flow, two parts. <code>getPath</code> does a DFS that <b>pushes</b> every node onto <code>arr</code> on the way down — and <b>pops</b> it back off when a subtree fails to find the target. That push/pop discipline <i>is</i> backtracking.
+       <b>Part 1</b> searches for <code>x = 7</code> in the tree from <code>main()</code> (watch node 6 get pushed then popped, and the <code>||</code> short-circuit skip half the tree). <b>Part 2</b> searches for a value that <b>isn't there</b> — every node gets pushed and popped. Just press ▶ Play.</p>
+  </header>
+
+  <div class="grid">
+    <div class="leftcol">
+    <section class="card">
+      <div class="card-title">
+        <span>Tree</span>
+        <span class="targetbadge" id="targetBadge">🎯 x = 7</span>
+        <span class="phasetrack" id="phasetrack"></span>
+      </div>
+      <svg id="tree" aria-label="binary tree"></svg>
+      <div class="formula">push on the way down · pop when a subtree fails · nodes that stay in <code>arr</code> form the path</div>
+    </section>
+
+    <section class="card">
+      <div class="card-title">path vector (arr) <span class="stats" id="pathStats"></span></div>
+      <div id="pathBox"></div>
+      <div class="note">📥 <code>arr.push_back(val)</code> on entry · 📤 <code>arr.pop_back()</code> when both subtrees fail. If the target is found, the returns race up <b>without popping</b> — so <code>arr</code> keeps exactly the root-to-target path.</div>
+    </section>
+    </div>
+
+    <aside class="side">
+      <section class="card">
+        <div class="card-title">Code</div>
+        <div id="code"></div>
+      </section>
+      <section class="card">
+        <div class="card-title">Call stack <span class="stats" id="stats"></span></div>
+        <div id="stack"></div>
+        <div class="note">🔀 <code>getPath(left) || getPath(right)</code> — if the left search succeeds, the right subtree is <b>never explored</b> (short-circuit), and the found path is preserved all the way up.</div>
+      </section>
+      <section class="card">
+        <div class="card-title">Program output</div>
+        <pre id="term"><span class="tc">$ g++ path.cpp -o path &amp;&amp; ./path</span>
+<span id="tl0" class="hidden">Path from root to node with value 7: 3 -&gt; 5 -&gt; 2 -&gt; 7</span>
+<span id="tmid" class="hidden tc">$ ./path --demo missing-target         # part 2 (demo run)</span>
+<span id="tl1" class="hidden badline">Path from root to node with value 9: (empty — target not in tree)</span>
+<span id="twait">▊ waiting for the runs…</span></pre>
+      </section>
+    </aside>
+  </div>
+
+  <section class="card msg-card"><div id="msg"></div></section>
+
+  <section class="card controls">
+    <div class="btns">
+      <button id="bReset" title="Reset (Home)">⏮</button>
+      <button id="bPrev"  title="Step back (←)">⏴ Step</button>
+      <button id="bPlay"  title="Play / Pause (Space)">▶ Play</button>
+      <button id="bNext"  title="Step forward (→)">Step ⏵</button>
+      <button id="bEnd"   title="Jump to end (End)">⏭</button>
+    </div>
+    <input type="range" id="scrub" min="-1" max="1" value="-1" title="Scrub through the trace">
+    <div class="meta">
+      <span id="counter"></span>
+      <label class="spd" title="Playback speed">🐢 <input type="range" id="speed" min="1" max="10" value="6"> 🐇</label>
+    </div>
+  </section>
+
+  <div class="legend">
+    <span><i class="dot cur"></i>current call</span>
+    <span><i class="dot stk"></i>on the call stack</span>
+    <span><i class="dot pth"></i>in arr (current path)</span>
+    <span><i class="lnBest"></i>path edges</span>
+    <span><i class="dot ded"></i>backtracked (popped)</span>
+    <span><i class="dot tgt"></i>target</span>
+    <span><i class="lnDown"></i>call ↓</span>
+    <span><i class="lnUp"></i>return ↑</span>
+    <span style="color:#64748b">Shortcuts: Space · ←/→ · Home/End</span>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================= tree definition (exact tree from main()) ================= */
+const TREE={
+  nodes:{'3':{l:'5',r:'1'},'5':{l:'6',r:'2'},'1':{l:'0',r:'8'},'6':{l:null,r:null},'2':{l:'7',r:'4'},
+         '0':{l:null,r:null},'8':{l:null,r:null},'7':{l:null,r:null},'4':{l:null,r:null}},
+  ids:['3','5','1','6','2','0','8','7','4'],
+  edges:[['3','5'],['3','1'],['5','6'],['5','2'],['1','0'],['1','8'],['2','7'],['2','4']],
+  pos:{'3':[410,60],'5':[200,170],'1':[620,170],'6':[95,280],'2':[305,280],'0':[515,280],'8':[725,280],
+       '7':[250,390],'4':[360,390]},
+  vb:'0 0 820 460'
+};
+const ROOT='3';
+
+/* ================= trace generation (exact C++ semantics incl. || short-circuit) ================= */
+function buildTrace(nodes,root,target){
+  const st=[];
+  st.push({t:'solve-enter',target:target});
+  st.push({t:'solve-init'});
+  st.push({t:'solve-call'});
+  function GP(id){
+    st.push({t:'gp-enter',id:id});
+    if(id==null){ st.push({t:'gp-null'}); return false; }
+    st.push({t:'gp-push',id:id});
+    if(Number(id)===target){
+      st.push({t:'gp-match',id:id});
+      st.push({t:'gp-rettrue',id:id,why:'match'});
+      return true;
+    }
+    st.push({t:'gp-goleft',id:id});
+    const a=GP(nodes[id].l);
+    st.push({t:'gp-leftres',id:id,v:a});
+    if(a){
+      st.push({t:'gp-orshort',id:id});
+      st.push({t:'gp-rettrue',id:id,why:'or'});
+      return true;
+    }
+    st.push({t:'gp-goright',id:id});
+    const b=GP(nodes[id].r);
+    st.push({t:'gp-rightres',id:id,v:b});
+    if(b){
+      st.push({t:'gp-rettrue',id:id,why:'or'});
+      return true;
+    }
+    st.push({t:'gp-pop',id:id});
+    st.push({t:'gp-retfalse',id:id});
+    return false;
+  }
+  const ok=GP(root);
+  st.push({t:'solve-ret',found:ok});
+  st.push({t:'done',found:ok});
+  return st;
+}
+
+/* ================= two-part timeline ================= */
+const PARTS=[
+  {target:7, trace:buildTrace(TREE.nodes,ROOT,7), short:'1 · target 7 (found)'},
+  {target:9, trace:buildTrace(TREE.nodes,ROOT,9), short:'2 · target 9 (missing)'}
+];
+let allSteps=[];
+PARTS.forEach(function(p,i){ if(i>0)allSteps.push({t:'intro',part:i}); p.start=allSteps.length; allSteps=allSteps.concat(p.trace); p.end=allSteps.length-1; });
+const LAST=allSteps.length-1;
+function phaseState(u){
+  if(u<0)return {part:0,local:-1,intro:false};
+  if(u===PARTS[1].start-1)return {part:1,local:-1,intro:true};
+  if(u>=PARTS[1].start)return {part:1,local:u-PARTS[1].start,intro:false};
+  return {part:0,local:u-PARTS[0].start,intro:false};
+}
+function popDone(stack){while(stack.length&&stack[stack.length-1].stage==='ret')stack.pop();}
+
+/* line indices */
+const LL={solveE:16,solveI:17,solveC:21,solveR:22,enter:1,nullRet:2,push:4,match:5,matchRet:6,
+          goleft:8,leftres:8,orshort:8,goright:9,rightres:9,rettrue:10,pop:12,retfalse:13};
+
+/* ================= replay ================= */
+function replay(part,u,partNo){
+  const nodes=TREE.nodes,target=part.target;
+  const stack=[],arr=[],visited=new Set(),poppedSet=new Set();
+  let msg='👋 Part '+partNo+': getPath searches for x = '+target+'. Push on the way down, pop on failure. ▶ Play — or Step.',
+      line=-1,edge=null,current=null,banner=false,gpCalls=0,nullCalls=0,found=false,
+      lastPush=null,lastPop=null,pushes=0,pops=0;
+  for(let k=0;k<=u&&k<part.trace.length;k++){
+    const s=part.trace[k];edge=null;lastPush=null;lastPop=null;
+    const topF=()=>stack[stack.length-1];
+    if(s.t==='solve-enter'){
+      stack.push({fn:'SV',stage:'run'});
+      line=LL.solveE;msg='📞 solve(root, B='+target+') called';
+    }else if(s.t==='solve-init'){
+      line=LL.solveI;msg='🔧 vector<int> arr created — the path will be built inside it';
+    }else if(s.t==='solve-call'){
+      line=LL.solveC;msg='⬇️ getPath(root, arr, '+target+') — the search begins at the root';
+    }else if(s.t==='gp-enter'){
+      gpCalls++;stack.push({fn:'GP',id:s.id,stage:'enter',leftRes:null,rightRes:null});
+      if(s.id!=null)visited.add(String(s.id));
+      current=s.id;
+      line=LL.enter;
+      msg=(s.id==null)?'📞 getPath(NULL, arr, '+target+')':'📞 getPath(node '+s.id+', arr, '+target+') — not null, continue';
+    }else if(s.t==='gp-null'){
+      const f=topF();f.stage='ret';f.res=false;nullCalls++;
+      line=LL.nullRet;msg='↩️ NULL → return false (dead end)';
+    }else if(s.t==='gp-push'){
+      const f=topF();f.stage='pushed';
+      arr.push(s.id);pushes++;lastPush=s.id;current=s.id;
+      line=LL.push;msg='📥 arr.push_back('+s.id+') — path is now ['+arr.join(', ')+']';
+    }else if(s.t==='gp-match'){
+      const f=topF();f.stage='match';
+      line=LL.match;msg='🎯 node '+s.id+' == x! Found the target — it stays in arr, NO pop for this branch!';
+    }else if(s.t==='gp-goleft'){
+      const f=topF();f.stage='gl';
+      const c=nodes[s.id].l;
+      edge={a:s.id,b:c==null?'NULL':String(c),dir:'down'};
+      line=LL.goleft;msg='⬇️ not the target → search LEFT: getPath(left of '+s.id+')';
+    }else if(s.t==='gp-leftres'){
+      popDone(stack);
+      const f=topF();f.leftRes=s.v;f.stage='lr';
+      const c=nodes[f.id].l;
+      edge={a:c==null?'NULL':String(c),b:String(f.id),dir:'up'};
+      current=f.id;
+      line=LL.leftres;
+      msg=s.v?'⬆️ LEFT subtree found the target! || short-circuits…':'⬆️ left subtree returned false → try the RIGHT side (|| continues)';
+    }else if(s.t==='gp-orshort'){
+      const f=topF();f.stage='sc';
+      line=LL.orshort;msg='⚡ || short-circuit at node '+f.id+': the right subtree is NEVER explored — path preserved!';
+    }else if(s.t==='gp-goright'){
+      const f=topF();f.stage='gr';
+      const c=nodes[s.id].r;
+      edge={a:s.id,b:c==null?'NULL':String(c),dir:'down'};
+      line=LL.goright;msg='⬇️ search RIGHT: getPath(right of '+s.id+')';
+    }else if(s.t==='gp-rightres'){
+      popDone(stack);
+      const f=topF();f.rightRes=s.v;f.stage='rr';
+      const c=nodes[f.id].r;
+      edge={a:c==null?'NULL':String(c),b:String(f.id),dir:'up'};
+      current=f.id;
+      line=LL.rightres;
+      msg=s.v?'⬆️ RIGHT subtree found the target → return true, keep all path nodes':'⬆️ right subtree also failed…';
+    }else if(s.t==='gp-pop'){
+      const f=topF();f.stage='pop';
+      arr.pop();pops++;poppedSet.add(s.id);lastPop=s.id;current=s.id;
+      line=LL.pop;msg='📤 arr.pop_back() — BACKTRACK: node '+s.id+' removed (path is now ['+(arr.length?arr.join(', '):'')+'])';
+    }else if(s.t==='gp-retfalse'){
+      const f=topF();f.stage='ret';f.res=false;
+      const parent=stack.length>1?stack[stack.length-2]:null;
+      edge=(parent&&parent.fn==='GP'&&parent.id!=null)?{a:String(s.id),b:String(parent.id),dir:'up'}:null;
+      line=LL.retfalse;msg='↩️ getPath(node '+s.id+') returns false';
+    }else if(s.t==='gp-rettrue'){
+      const f=topF();f.stage='ret';f.res=true;
+      const parent=stack.length>1?stack[stack.length-2]:null;
+      edge=(parent&&parent.fn==='GP'&&parent.id!=null)?{a:String(s.id),b:String(parent.id),dir:'up'}:null;
+      line=s.why==='match'?LL.matchRet:LL.rettrue;
+      msg='↩️ getPath(node '+s.id+') returns TRUE — the path stays intact';
+    }else if(s.t==='solve-ret'){
+      popDone(stack);
+      const f=topF();f.stage='ret';f.res=arr.slice();found=s.found;
+      line=LL.solveR;
+      msg=s.found?('✅ getPath finished → solve returns arr = ['+arr.join(', ')+']')
+                  :'✅ getPath finished with no match → solve returns an EMPTY arr';
+    }else if(s.t==='done'){
+      popDone(stack);banner=true;found=s.found;current=null;line=-1;
+      if(partNo===1){
+        msg='🏁 Part 1 complete: path = ['+arr.join(', ')+'] = 3 → 5 → 2 → 7. Node 6 was pushed then POPPED (dead end); nodes 1, 0, 8, 4 were never visited (|| short-circuit). '+gpCalls+' getPath calls.';
+      }else{
+        msg='🏁 All done! Part 2: target '+target+' isn’t in the tree — all 9 nodes were pushed and popped, arr ended EMPTY. Recap: Part 1 → 3 → 5 → 2 → 7 · Part 2 → empty. Push down, pop on failure = backtracking.';
+      }
+    }
+  }
+  return {stack:stack,arr:arr,visited:visited,poppedSet:poppedSet,msg:msg,line:line,edge:edge,current:current,
+          banner:banner,found:found,gpCalls:gpCalls,nullCalls:nullCalls,pushes:pushes,pops:pops,lastPush:lastPush,lastPop:lastPop};
+}
+function replayPart(p,u){return replay(p,u,0);}
+const PARTSUMS=PARTS.map(function(p){return replayPart(p,p.trace.length-1);});
+const INTRO_MSG='🎬 Part 1 done: path = 3 → 5 → 2 → 7. Notice node 6: pushed, explored, then POPPED when both children failed — that’s backtracking. And nodes 1, 0, 8, 4 were never visited: || short-circuited once 7 was found. Now Part 2: search for a value that ISN’T in the tree — watch every node get pushed and then popped.';
+const FINAL_MSG='🏁 Complete! Part 1 (target 7): path = 3 → 5 → 2 → 7 with one backtrack at node 6. Part 2 (target 9): '+PARTSUMS[1].pushes+' pushes and '+PARTSUMS[1].pops+' pops — the whole tree searched, arr ended empty. That push/pop discipline is backtracking.';
+
+/* ================= code panel ================= */
+const CODE=[
+  '<span class="kw">bool</span> <span class="fn">getPath</span>(TreeNode* root, <span class="kw">vector</span>&lt;<span class="kw">int</span>&gt;&amp; arr, <span class="kw">int</span> x) {',
+  '    <span class="kw">if</span> (!root) {',
+  '        <span class="kw">return</span> <span class="nu">false</span>;',
+  '    }',
+  '    arr.push_back(root-&gt;val);',
+  '    <span class="kw">if</span> (root-&gt;val == x) {',
+  '        <span class="kw">return</span> <span class="nu">true</span>;',
+  '    }',
+  '    <span class="kw">if</span> (<span class="fn">getPath</span>(root-&gt;left, arr, x) ||',
+  '        <span class="fn">getPath</span>(root-&gt;right, arr, x)) {',
+  '        <span class="kw">return</span> <span class="nu">true</span>;',
+  '    }',
+  '    arr.pop_back();   <span class="cm">// backtrack</span>',
+  '    <span class="kw">return</span> <span class="nu">false</span>;',
+  '}',
+  '',
+  '<span class="kw">vector</span>&lt;<span class="kw">int</span>&gt; <span class="fn">solve</span>(TreeNode* A, <span class="kw">int</span> B) {',
+  '    <span class="kw">vector</span>&lt;<span class="kw">int</span>&gt; arr;',
+  '    <span class="kw">if</span> (A == <span class="nu">NULL</span>) {',
+  '        <span class="kw">return</span> arr;',
+  '    }',
+  '    <span class="fn">getPath</span>(A, arr, B);',
+  '    <span class="kw">return</span> arr;',
+  '}'];
+
+/* ================= DOM / rendering ================= */
+if(typeof document!=='undefined'){
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('tree');
+function E(tag,attrs,parent){const el=document.createElementNS(NS,tag);for(const k in attrs)el.setAttribute(k,attrs[k]);if(parent)parent.appendChild(el);return el;}
+function marker(defs,id,color){const m=E('marker',{id:id,viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:6.5,markerHeight:6.5,orient:'auto-start-reverse'},defs);E('path',{d:'M0,0L10,5L0,10z',fill:color},m);}
+
+let nodeEls={},aLine=null,gPath=null,gTarget=null;
+function buildSVG(){
+  svg.setAttribute('viewBox',TREE.vb);
+  svg.innerHTML='';
+  nodeEls={};
+  const defs=E('defs',{},svg);
+  marker(defs,'arrDown','#f59e0b');marker(defs,'arrUp','#22c55e');
+  const gE=E('g',{},svg);
+  gPath=E('g',{},svg);
+  const gA=E('g',{},svg),gN=E('g',{},svg);
+  gTarget=E('g',{},svg);
+  for(const [a,b] of TREE.edges){
+    const p1=TREE.pos[a],p2=TREE.pos[b];
+    E('line',{x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],class:'edge'},gE);
+  }
+  aLine=E('line',{class:'aline'},gA);aLine.style.display='none';
+  for(const id of TREE.ids){
+    const p=TREE.pos[id],x=p[0],y=p[1],g=E('g',{},gN);
+    const c=E('circle',{cx:x,cy:y,r:26,class:'node'},g);
+    const t=E('text',{x:x,y:y,class:'nval'},g);t.textContent=id;
+    nodeEls[id]={c:c};
+  }
+}
+buildSVG();
+
+const codeBox=document.getElementById('code');
+CODE.forEach(function(h,i){
+  const d=document.createElement('div');d.className='cl';d.id='cl'+i;
+  d.innerHTML='<span class="ln">'+(i+1)+'</span><span class="lt">'+h+'</span>';
+  codeBox.appendChild(d);
+});
+
+const msgEl=document.getElementById('msg'),stackEl=document.getElementById('stack'),
+      statsEl=document.getElementById('stats'),counterEl=document.getElementById('counter'),
+      scrub=document.getElementById('scrub'),bPlay=document.getElementById('bPlay'),
+      pathBox=document.getElementById('pathBox'),pathStatsEl=document.getElementById('pathStats'),
+      targetBadge=document.getElementById('targetBadge'),
+      tl0=document.getElementById('tl0'),tl1=document.getElementById('tl1'),
+      tmid=document.getElementById('tmid'),twait=document.getElementById('twait');
+scrub.max=String(LAST);
+
+/* phase tracker */
+const trackEl=document.getElementById('phasetrack'),trackBtns=[];
+PARTS.forEach(function(p,i){
+  const b=document.createElement('button');
+  b.textContent=p.short;
+  b.title='Jump to part '+(i+1);
+  b.onclick=function(){stopPlay();setIdx(p.start);};
+  trackEl.appendChild(b);trackBtns.push(b);
+});
+
+let idx=-1,playing=false,timer=null;
+const delay=()=>1650-Number(document.getElementById('speed').value)*155;
+
+function render(){
+  const ps=phaseState(idx);
+  const part=PARTS[ps.part];
+  let st;
+  if(ps.intro){ st=replayPart(part,-1); st.msg=INTRO_MSG; }
+  else st=replay(part,ps.local,ps.part+1);
+  if(idx===LAST)st.msg=FINAL_MSG;
+
+  /* target marker */
+  gTarget.innerHTML='';
+  const targetId=String(part.target);
+  if(TREE.nodes[targetId]){
+    const p=TREE.pos[targetId];
+    E('circle',{cx:p[0],cy:p[1],r:33,class:'tring'},gTarget);
+    if(st.found){const t=E('text',{x:p[0],y:p[1]-40,class:'tstar'},gTarget);t.textContent='★ found';}
+  }
+  /* path overlay */
+  gPath.innerHTML='';
+  for(let i=0;i+1<st.arr.length;i++){
+    const p1=TREE.pos[st.arr[i]],p2=TREE.pos[st.arr[i+1]];
+    E('line',{x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],class:'ppath'},gPath);
+  }
+  /* nodes */
+  const inStack=new Set(st.stack.filter(f=>f.id!=null).map(f=>String(f.id)));
+  const inPath=new Set(st.arr);
+  for(const id of TREE.ids){
+    const el=nodeEls[id];let cl='node';
+    if(inStack.has(id)&&st.current!==id&&st.current!==Number(id))cl+=' onstack';
+    if(inPath.has(id))cl+=' onpath';
+    if(st.current!=null&&String(st.current)===id)cl+=' current';
+    if(st.poppedSet.has(id)&&!inPath.has(id))cl+=' dead';
+    if(st.banner&&st.found&&String(part.target)===id)cl+=' found';
+    el.c.setAttribute('class',cl);
+  }
+  /* active edge */
+  if(st.edge&&st.edge.a!=='NULL'&&st.edge.b!=='NULL'){
+    const p1=TREE.pos[st.edge.a],p2=TREE.pos[st.edge.b];
+    const dx=p2[0]-p1[0],dy=p2[1]-p1[1],len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len;
+    aLine.setAttribute('x1',p1[0]+ux*28);aLine.setAttribute('y1',p1[1]+uy*28);
+    aLine.setAttribute('x2',p2[0]-ux*35);aLine.setAttribute('y2',p2[1]-uy*35);
+    aLine.setAttribute('class','aline '+(st.edge.dir==='down'?'down':'up'));
+    aLine.setAttribute('marker-end',st.edge.dir==='down'?'url(#arrDown)':'url(#arrUp)');
+    aLine.style.display='';
+  } else aLine.style.display='none';
+  /* code highlight */
+  for(let i=0;i<CODE.length;i++)document.getElementById('cl'+i).classList.toggle('hl',st.line===i);
+  /* path panel */
+  pathBox.innerHTML='';
+  if(!st.arr.length){pathBox.innerHTML='<span class="pempty">arr is empty'+(st.banner?' — '+(st.found?'':'target not found'):' — waiting for the first push…')+'</span>';}
+  st.arr.forEach(function(id,i){
+    if(i>0){const a=document.createElement('span');a.className='parrow';a.textContent='→';pathBox.appendChild(a);}
+    const s=document.createElement('span');
+    s.className='pcell'+(st.lastPush===id?' fresh':'');
+    s.textContent=id;
+    pathBox.appendChild(s);
+  });
+  pathStatsEl.textContent='size: '+st.arr.length+' · pushes: '+st.pushes+' · pops: '+st.pops;
+  /* stack */
+  stackEl.innerHTML='';
+  if(!st.stack.length){
+    stackEl.innerHTML='<div class="empty">'+(st.banner?'all frames returned — the stack is empty again':'the stack is empty — nothing running yet')+'</div>';
+  }
+  st.stack.forEach(function(f,i){
+    const d=document.createElement('div');
+    const isTop=i===st.stack.length-1;
+    const badRet=f.stage==='ret'&&f.res===false;
+    d.className='frame '+(f.fn==='SV'?'sv':'gp')+(isTop?' top':'')+(f.stage==='ret'?' fret':'')+(badRet?' badret':'');
+    let chips='';
+    if(f.fn==='SV'){
+      chips=f.stage==='ret'
+        ?'<span class="res '+(f.res.length?'ok':'bad')+'">returns ['+f.res.join(', ')+']</span>'
+        :'<span class="chip live">arr = ['+st.arr.join(', ')+']</span>';
+    }else{
+      if(f.leftRes!=null)chips+='<span class="chip '+(f.leftRes?'on':'bad')+'">left: '+(f.leftRes?'true ✓':'false')+'</span>';
+      if(f.rightRes!=null)chips+='<span class="chip '+(f.rightRes?'on':'bad')+'">right: '+(f.rightRes?'true ✓':'false')+'</span>';
+      if(f.stage==='pop')chips+='<span class="chip bad">popped ↩</span>';
+      if(f.stage==='ret')chips+=f.res?'<span class="res ok">returns true</span>':'<span class="res bad">returns false</span>';
+    }
+    const icon=f.fn==='SV'?'🧭':'🔎';
+    const title=f.fn==='SV'?'solve(root, '+part.target+')':(f.id!=null?'getPath(node '+f.id+', x='+part.target+')':'getPath(NULL, x='+part.target+')');
+    d.innerHTML='<div class="ftitle">'+icon+' '+title+(isTop?' <span class="toplbl">◂ top</span>':'')+'</div>'+
+                (chips?'<div class="fchips">'+chips+'</div>':'');
+    stackEl.appendChild(d);
+  });
+  /* phase tracker + target badge */
+  trackBtns.forEach(function(b,i){
+    const done=idx>=PARTS[i].end,active=(ps.part===i);
+    b.className=done?'done':(active?'active':'');
+  });
+  targetBadge.textContent='🎯 x = '+part.target;
+  /* text bits */
+  msgEl.textContent=st.msg;
+  statsEl.textContent='getPath calls: '+st.gpCalls+' ('+st.nullCalls+' null)';
+  counterEl.textContent='Step '+(idx+1)+' / '+allSteps.length+' · part '+(ps.part+1)+'/2';
+  scrub.value=String(idx);
+  bPlay.textContent=playing?'⏸ Pause':'▶ Play';
+  tl0.classList.toggle('hidden',idx<PARTS[0].end);
+  tmid.classList.toggle('hidden',idx<PARTS[1].start-1);
+  tl1.classList.toggle('hidden',idx<LAST);
+  twait.classList.toggle('hidden',idx>=PARTS[0].end);
+}
+
+/* ================= controls ================= */
+function setIdx(v){idx=Math.max(-1,Math.min(LAST,v));render();}
+function stopPlay(){if(playing){playing=false;clearTimeout(timer);render();}}
+function play(){if(idx>=LAST)setIdx(-1);playing=true;render();timer=setTimeout(tick,delay());}
+function tick(){if(!playing)return;if(idx>=LAST){stopPlay();return;}setIdx(idx+1);timer=setTimeout(tick,delay());}
+bPlay.onclick=function(){playing?stopPlay():play();};
+document.getElementById('bReset').onclick=function(){stopPlay();setIdx(-1);};
+document.getElementById('bPrev').onclick=function(){stopPlay();setIdx(idx-1);};
+document.getElementById('bNext').onclick=function(){stopPlay();setIdx(idx+1);};
+document.getElementById('bEnd').onclick=function(){stopPlay();setIdx(LAST);};
+scrub.addEventListener('input',function(){stopPlay();setIdx(Number(scrub.value));});
+document.getElementById('speed').addEventListener('input',function(){
+  if(playing){clearTimeout(timer);timer=setTimeout(tick,delay());}
+});
+document.addEventListener('keydown',function(e){
+  if(e.code==='Space'){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='ArrowRight'){e.preventDefault();stopPlay();setIdx(idx+1);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();stopPlay();setIdx(idx-1);}
+  else if(e.key==='Home'){stopPlay();setIdx(-1);}
+  else if(e.key==='End'){stopPlay();setIdx(LAST);}
+});
+render();
+}
+</script>
+</body>
+</html>

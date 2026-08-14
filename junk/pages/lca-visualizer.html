@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Lowest Common Ancestor — Recursion Visualizer</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2c; --panel2:#0d1626; --border:#24324d;
+    --text:#e2e8f0; --muted:#94a3b8;
+    --amber:#f59e0b; --green:#22c55e; --red:#ef4444; --sky:#38bdf8; --pink:#f472b6; --gold:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 700px at 70% -10%, #16233d 0%, var(--bg) 55%);color:var(--text);
+       font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1240px;margin:0 auto;padding:22px 18px 40px;}
+  header h1{margin:0;font-size:24px;letter-spacing:.2px}
+  header .sub{margin:6px 0 0;color:var(--muted);font-size:14px;max-width:930px}
+  header code,.formula code,.note code{background:#1e293b;border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:12px;color:#fbbf24}
+  .grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(340px,1fr);gap:14px;margin-top:16px}
+  .leftcol{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .side{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 16px;min-width:0}
+  .card-title{font-size:11.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .stats{font-weight:500;letter-spacing:0;text-transform:none;color:#7dd3fc;font-size:12px}
+  .pqbadge{font:700 12px ui-monospace,Menlo,monospace;border-radius:7px;padding:3px 9px;letter-spacing:0;text-transform:none}
+  .pqbadge.p{color:#bae6fd;background:#082f49;border:1px solid var(--sky)}
+  .pqbadge.q{color:#fbcfe8;background:#4a044e;border:1px solid var(--pink)}
+  svg{width:100%;height:auto;display:block}
+  .formula{margin-top:8px;color:var(--muted);font-size:13px;text-align:center}
+
+  .phasetrack{display:flex;gap:6px;flex-wrap:wrap}
+  .phasetrack button{padding:4px 10px;font-size:12px;border-radius:8px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted)}
+  .phasetrack button.active{background:var(--amber);border-color:var(--amber);color:#1f2937}
+  .phasetrack button.done{background:#052e16;border-color:#166534;color:#86efac}
+
+  /* ---- SVG tree ---- */
+  .edge{stroke:#334155;stroke-width:2}
+  .node{fill:#1e293b;stroke:#64748b;stroke-width:2;transition:fill .2s,stroke .2s,opacity .3s}
+  .node.onstack{fill:#0c4a6e;stroke:var(--sky)}
+  .node.current{fill:#7c2d12;stroke:var(--amber);stroke-width:4}
+  .node.dead{opacity:.45}
+  .node.lca{stroke:var(--gold);stroke-width:4}
+  .nval{fill:#f1f5f9;font-weight:700;font-size:19px;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+  .pring{fill:none;stroke-width:2;stroke-dasharray:5 4}
+  .plbl{font-size:12px;font-weight:800;text-anchor:middle}
+  .lring{fill:none;stroke:var(--gold);stroke-width:2.5}
+  .llbl{fill:var(--gold);font-size:12px;font-weight:800;text-anchor:middle}
+  .retc rect{fill:#0f172a;stroke-width:1.3}
+  .retc text{font-size:11.5px;font-weight:700;text-anchor:middle}
+  .aline{stroke-width:3;fill:none;stroke-dasharray:8 7;animation:flow .55s linear infinite}
+  .aline.down{stroke:var(--amber)}
+  .aline.up{stroke:var(--green)}
+  .aline.upnull{stroke:#64748b}
+  @keyframes flow{to{stroke-dashoffset:-15}}
+
+  /* ---- code ---- */
+  #code{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:8px 0;overflow-x:auto}
+  .cl{padding:1.5px 12px 1.5px 8px;white-space:pre}
+  .cl .ln{display:inline-block;width:20px;margin-right:12px;text-align:right;color:#475569;user-select:none}
+  .cl.hl{background:rgba(245,158,11,.16);box-shadow:inset 3px 0 0 var(--amber)}
+  .kw{color:#c084fc} .fn{color:#7dd3fc} .nu{color:#fb923c} .nm{color:#4ade80} .cm{color:#64748b;font-style:italic}
+
+  /* ---- stack ---- */
+  #stack{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;padding-right:4px}
+  .empty{color:var(--muted);font-size:13px;font-style:italic;padding:6px 2px}
+  .frame{border:1px solid #334155;border-radius:10px;padding:7px 10px;background:#0f1a2e;font-size:13px}
+  .frame.lc{border-left:3px solid var(--sky)}
+  .frame.top{border-color:var(--amber);box-shadow:0 0 0 1px rgba(245,158,11,.25)}
+  .frame.fret{border-color:var(--green)}
+  .frame.fret.goldret{border-color:var(--gold)}
+  .ftitle{font:600 12.6px ui-monospace,Menlo,Consolas,monospace;color:#cbd5e1}
+  .toplbl{color:var(--amber);font-size:10.5px;font-family:system-ui;letter-spacing:.04em}
+  .fchips{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center}
+  .chip{font:600 11.5px ui-monospace,Menlo,monospace;background:#1e293b;border:1px solid #334155;color:#64748b;border-radius:6px;padding:2px 8px}
+  .chip.on{color:#a7f3d0;border-color:#14532d;background:#052e16}
+  .chip.dim{color:#64748b}
+  .chip.gold{color:#fde68a;border-color:var(--gold);background:#4a3a06}
+  .chip.p{color:#bae6fd;border-color:#0c4a6e;background:#082f49}
+  .chip.q{color:#fbcfe8;border-color:#4a044e;background:#4a044e}
+  .res{font:700 11.5px ui-monospace,Menlo,monospace;border-radius:6px;padding:2px 8px}
+  .res.ok{color:#bbf7d0;background:#14532d;border:1px solid #166534}
+  .res.nul{color:#94a3b8;background:#1e293b;border:1px solid #334155}
+  .res.gold{color:#fde68a;background:#4a3a06;border:1px solid var(--gold)}
+
+  /* ---- message + controls ---- */
+  .msg-card{margin-top:14px;font-size:15px;min-height:46px;display:flex;align-items:center;gap:10px}
+  .msg-card::before{content:"💬";font-size:18px}
+  .controls{margin-top:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  .btns{display:flex;gap:8px}
+  button{background:#1e293b;color:var(--text);border:1px solid #334155;border-radius:10px;padding:8px 13px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
+  button:hover{background:#273549;border-color:#4a5c7a}
+  #bPlay{background:var(--amber);border-color:var(--amber);color:#1f2937;min-width:104px}
+  #bPlay:hover{background:#fbbf24}
+  #scrub{flex:1;min-width:200px;accent-color:var(--amber);cursor:pointer}
+  .meta{display:flex;align-items:center;gap:14px;color:var(--muted);font-size:12.5px;white-space:nowrap}
+  .spd{display:flex;align-items:center;gap:6px}
+  .spd input{accent-color:var(--amber);width:90px;cursor:pointer}
+
+  /* ---- terminal + legend ---- */
+  #term{margin:0;font:12.5px/1.75 ui-monospace,Menlo,Consolas,monospace;background:#020617;border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:#86efac}
+  .tc{color:#7dd3fc}
+  #twait{color:#64748b}
+  .hidden{display:none}
+  .legend{margin-top:14px;display:flex;flex-wrap:wrap;gap:16px;color:var(--muted);font-size:12.5px;align-items:center}
+  .legend i{display:inline-block;vertical-align:-2px;margin-right:6px}
+  .dot{width:12px;height:12px;border-radius:50%}
+  .dot.cur{background:#7c2d12;border:2.5px solid var(--amber)}
+  .dot.stk{background:#0c4a6e;border:2px solid var(--sky)}
+  .dot.ded{background:#1e293b;border:2px solid #64748b;opacity:.45}
+  .dot.lca{background:#1e293b;border:2.5px solid var(--gold)}
+  .dot.pr{background:#1e293b;border:2px dashed var(--sky)}
+  .dot.qr{background:#1e293b;border:2px dashed var(--pink)}
+  .lnDown{width:26px;height:0;border-top:3px dashed var(--amber)}
+  .lnUp{width:26px;height:0;border-top:3px dashed var(--green)}
+  .note{margin-top:10px;color:var(--muted);font-size:12.5px}
+  @media(max-width:960px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🧬 Lowest Common Ancestor — Recursion Visualizer</h1>
+    <p class="sub">One guided flow, three scenarios. Each call returns a <b>pointer</b>: NULL (nothing found), the node itself if it <i>is</i> p or q (early stop!), or the LCA found deeper. Results bubble up — and the node where <b>left and right both come back non-null</b> is the split point: the LCA.
+       <b>Part 1</b> is the exact <code>main()</code> case (p=5, q=1), <b>Part 2</b> hides both targets deep in one subtree, <b>Part 3</b> makes one target the other's ancestor. Just press ▶ Play.</p>
+  </header>
+
+  <div class="grid">
+    <div class="leftcol">
+    <section class="card">
+      <div class="card-title">
+        <span>Tree</span>
+        <span>
+          <span class="pqbadge p" id="pBadge">P = node 5</span>
+          <span class="pqbadge q" id="qBadge">Q = node 1</span>
+        </span>
+        <span class="phasetrack" id="phasetrack"></span>
+      </div>
+      <svg id="tree" aria-label="binary tree"></svg>
+      <div class="formula">return <code>root</code> if it's NULL/p/q · else combine both sides: <code>NULL → pass the other up</code> · <code>both non-null → this node is the LCA</code></div>
+    </section>
+
+    <section class="card">
+      <div class="card-title">What each call returned <span class="stats" id="retStats"></span></div>
+      <div id="retNote" class="note" style="margin-top:0">The chip under each finished node shows the pointer its call returned. Watch non-null results <b>rise toward the root</b> — where two of them meet is the LCA.</div>
+    </section>
+    </div>
+
+    <aside class="side">
+      <section class="card">
+        <div class="card-title">Code</div>
+        <div id="code"></div>
+      </section>
+      <section class="card">
+        <div class="card-title">Call stack <span class="stats" id="stats"></span></div>
+        <div id="stack"></div>
+        <div class="note">🎯 A call that lands directly on p or q returns <b>immediately</b> — it never descends, because an ancestor of p can't be below p itself. That's why the ancestor case (Part 3) is so cheap.</div>
+      </section>
+      <section class="card">
+        <div class="card-title">Program output</div>
+        <pre id="term"><span class="tc">$ g++ lca.cpp -o lca &amp;&amp; ./lca</span>
+<span id="tl0" class="hidden">Lowest Common Ancestor: 3</span>
+<span id="tm1" class="hidden tc">$ ./lca --demo p=6 q=2          # part 2 (deep split)</span>
+<span id="tl1" class="hidden">Lowest Common Ancestor: 5</span>
+<span id="tm2" class="hidden tc">$ ./lca --demo p=6 q=5          # part 3 (ancestor case)</span>
+<span id="tl2" class="hidden">Lowest Common Ancestor: 5</span>
+<span id="twait">▊ waiting for the runs…</span></pre>
+      </section>
+    </aside>
+  </div>
+
+  <section class="card msg-card"><div id="msg"></div></section>
+
+  <section class="card controls">
+    <div class="btns">
+      <button id="bReset" title="Reset (Home)">⏮</button>
+      <button id="bPrev"  title="Step back (←)">⏴ Step</button>
+      <button id="bPlay"  title="Play / Pause (Space)">▶ Play</button>
+      <button id="bNext"  title="Step forward (→)">Step ⏵</button>
+      <button id="bEnd"   title="Jump to end (End)">⏭</button>
+    </div>
+    <input type="range" id="scrub" min="-1" max="1" value="-1" title="Scrub through the trace">
+    <div class="meta">
+      <span id="counter"></span>
+      <label class="spd" title="Playback speed">🐢 <input type="range" id="speed" min="1" max="10" value="6"> 🐇</label>
+    </div>
+  </section>
+
+  <div class="legend">
+    <span><i class="dot cur"></i>current call</span>
+    <span><i class="dot stk"></i>on the call stack</span>
+    <span><i class="dot pr"></i>p</span>
+    <span><i class="dot qr"></i>q</span>
+    <span><i class="dot lca"></i>LCA (split point)</span>
+    <span><i class="dot ded"></i>never visited</span>
+    <span><i class="lnDown"></i>call ↓</span>
+    <span><i class="lnUp"></i>pointer returns ↑</span>
+    <span style="color:#64748b">Shortcuts: Space · ←/→ · Home/End</span>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================= tree definition (exact tree from main()) ================= */
+const TREE={
+  nodes:{'3':{l:'5',r:'1'},'5':{l:'6',r:'2'},'1':{l:'0',r:'8'},
+         '6':{l:null,r:null},'2':{l:null,r:null},'0':{l:null,r:null},'8':{l:null,r:null}},
+  ids:['3','5','1','6','2','0','8'],
+  edges:[['3','5'],['3','1'],['5','6'],['5','2'],['1','0'],['1','8']],
+  pos:{'3':[410,60],'5':[200,170],'1':[620,170],'6':[95,280],'2':[305,280],'0':[515,280],'8':[725,280]},
+  vb:'0 0 820 356'
+};
+const ROOT='3';
+
+/* ================= trace generation ================= */
+function buildTrace(nodes,root,p,q){
+  const st=[];
+  st.push({t:'init',p:p,q:q});
+  function L(id){
+    st.push({t:'enter',id:id});
+    if(id==null){ st.push({t:'base-null'}); return null; }
+    if(id===p){ st.push({t:'base-p',id:id}); return id; }
+    if(id===q){ st.push({t:'base-q',id:id}); return id; }
+    st.push({t:'goleft',id:id});
+    const l=L(nodes[id].l);
+    st.push({t:'gotleft',id:id,res:l});
+    st.push({t:'goright',id:id});
+    const r=L(nodes[id].r);
+    st.push({t:'gotright',id:id,res:r});
+    let res,branch;
+    if(l==null){res=r;branch='right';}
+    else if(r==null){res=l;branch='left';}
+    else {res=id;branch='split';}
+    st.push({t:'decide',id:id,branch:branch});
+    st.push({t:'ret',id:id,res:res});
+    return res;
+  }
+  const lca=L(root);
+  st.push({t:'done',lca:lca});
+  return st;
+}
+
+/* ================= three-part timeline ================= */
+const PARTS=[
+  {p:'5',q:'1', short:'1 · p=5, q=1 (main)',     trace:buildTrace(TREE.nodes,ROOT,'5','1')},
+  {p:'6',q:'2', short:'2 · p=6, q=2 (deep split)', trace:buildTrace(TREE.nodes,ROOT,'6','2')},
+  {p:'6',q:'5', short:'3 · p=6, q=5 (ancestor)',   trace:buildTrace(TREE.nodes,ROOT,'6','5')}
+];
+let allSteps=[];
+PARTS.forEach(function(p,i){ if(i>0)allSteps.push({t:'intro',part:i}); p.start=allSteps.length; allSteps=allSteps.concat(p.trace); p.end=allSteps.length-1; });
+const LAST=allSteps.length-1;
+function phaseState(u){
+  if(u<0)return {part:0,local:-1,intro:false};
+  for(let i=1;i<PARTS.length;i++){ if(u===PARTS[i].start-1)return {part:i,local:-1,intro:true}; }
+  for(let i=PARTS.length-1;i>=0;i--){ if(u>=PARTS[i].start)return {part:i,local:u-PARTS[i].start,intro:false}; }
+  return {part:0,local:u,intro:false};
+}
+function popDone(stack){while(stack.length&&stack[stack.length-1].stage==='ret')stack.pop();}
+
+/* line indices */
+const LL={enter:1,base:2,goleft:4,gotleft:4,goright:5,gotright:5,retRight:7,retLeft:9,split:11};
+
+/* ================= replay ================= */
+function replay(part,u,partNo){
+  const nodes=TREE.nodes,p=part.p,q=part.q;
+  const stack=[],returns={},visited=new Set();
+  let msg='👋 Part '+partNo+': find the LCA of p='+p+' and q='+q+'. Each call returns a pointer; watch them bubble up. ▶ Play — or Step.',
+      line=-1,edge=null,edgeNull=false,current=null,banner=false,calls=0,nullCalls=0,earlyStops=0,
+      lcaId=null,activeBranch=null;
+  for(let k=0;k<=u&&k<part.trace.length;k++){
+    const s=part.trace[k];edge=null;edgeNull=false;activeBranch=null;
+    const topF=()=>stack[stack.length-1];
+    const nm=r=>r==null?'NULL':'node '+r;
+    if(s.t==='init'){
+      line=-1;msg='🎯 p = node '+p+', q = node '+q+' → lowestCommonAncestor(root, p, q) begins';
+    }else if(s.t==='enter'){
+      calls++;stack.push({fn:'LCA',id:s.id,stage:'enter',leftRes:undefined,rightRes:undefined,branch:null});
+      if(s.id!=null){visited.add(String(s.id));current=s.id;}
+      line=LL.enter;
+      msg=(s.id==null)?'📞 LCA(NULL) — base case territory':'📞 LCA(node '+s.id+') — is it NULL, p('+p+') or q('+q+')?';
+    }else if(s.t==='base-null'){
+      const f=topF();f.stage='ret';f.res=null;nullCalls++;
+      line=LL.base;msg='↩️ NULL → return NULL (no p or q down here)';
+    }else if(s.t==='base-p'){
+      const f=topF();f.stage='ret';f.res=s.id;f.hit='p';earlyStops++;
+      returns[s.id]=s.id;
+      line=LL.base;msg='🎯 node '+s.id+' IS p → return it immediately — never descend below p!';
+    }else if(s.t==='base-q'){
+      const f=topF();f.stage='ret';f.res=s.id;f.hit='q';earlyStops++;
+      returns[s.id]=s.id;
+      line=LL.base;msg='🎯 node '+s.id+' IS q → return it immediately — never descend below q!';
+    }else if(s.t==='goleft'){
+      const f=topF();f.stage='gl';
+      const c=nodes[s.id].l;
+      edge={a:s.id,b:c==null?'NULL':String(c),dir:'down'};
+      line=LL.goleft;msg='⬇️ not p or q → search the LEFT subtree';
+    }else if(s.t==='gotleft'){
+      popDone(stack);
+      const f=topF();f.leftRes=s.res;f.stage='lr';
+      const c=nodes[f.id].l;
+      edge={a:c==null?'NULL':String(c),b:String(f.id),dir:'up'};edgeNull=s.res==null;
+      current=f.id;
+      line=LL.gotleft;msg='⬆️ left returned '+nm(s.res);
+    }else if(s.t==='goright'){
+      const f=topF();f.stage='gr';
+      const c=nodes[s.id].r;
+      edge={a:s.id,b:c==null?'NULL':String(c),dir:'down'};
+      line=LL.goright;msg='⬇️ now search the RIGHT subtree';
+    }else if(s.t==='gotright'){
+      popDone(stack);
+      const f=topF();f.rightRes=s.res;f.stage='rr';
+      const c=nodes[f.id].r;
+      edge={a:c==null?'NULL':String(c),b:String(f.id),dir:'up'};edgeNull=s.res==null;
+      current=f.id;
+      line=LL.gotright;msg='⬆️ right returned '+nm(s.res)+' — time to decide';
+    }else if(s.t==='decide'){
+      const f=topF();f.branch=s.branch;f.stage='dec';activeBranch=s.id;
+      if(s.branch==='split'){
+        line=LL.split;msg='⭐ left AND right are both non-null → p and q sit on different sides of node '+s.id+' → node '+s.id+' IS the LCA!';
+      }else if(s.branch==='left'){
+        line=LL.retLeft;msg='right is NULL → both targets are in the LEFT subtree → pass left’s result ('+nm(f.leftRes)+') up';
+      }else{
+        line=LL.retRight;msg='left is NULL → both targets are in the RIGHT subtree → pass right’s result ('+nm(f.rightRes)+') up';
+      }
+    }else if(s.t==='ret'){
+      const f=topF();f.stage='ret';f.res=s.res;
+      returns[s.id]=s.res;
+      const parent=stack.length>1?stack[stack.length-2]:null;
+      edge=(parent&&parent.id!=null)?{a:String(s.id),b:String(parent.id),dir:'up'}:null;edgeNull=s.res==null;
+      line=f.branch==='split'?LL.split:(f.branch==='left'?LL.retLeft:LL.retRight);
+      msg='↩️ LCA(node '+s.id+') returns '+nm(s.res)+(f.branch==='split'?' ★':'');
+    }else if(s.t==='done'){
+      popDone(stack);banner=true;lcaId=s.lca;current=null;line=-1;
+      msg='🏁 Part '+partNo+' complete: LCA('+p+', '+q+') = node '+s.lca+'. '+calls+' calls ('+nullCalls+' on NULLs, '+earlyStops+' early stop'+(earlyStops===1?'':'s')+').';
+    }
+  }
+  return {stack:stack,returns:returns,visited:visited,msg:msg,line:line,edge:edge,edgeNull:edgeNull,current:current,
+          banner:banner,calls:calls,nullCalls:nullCalls,earlyStops:earlyStops,lcaId:lcaId,activeBranch:activeBranch};
+}
+function replayPart(pt,u){return replay(pt,u,0);}
+const PARTSUMS=PARTS.map(function(pt){return replayPart(pt,pt.trace.length-1);});
+
+const INTROS=[null,
+  '🎬 Part 1 done: LCA(5, 1) = 3 — the root itself is the split point: p bounced back from the left, q from the right, and only 3 calls were needed. Now Part 2: p=6, q=2 — both hide under node 5, so the split happens DEEPER and more of the tree gets searched.',
+  '🎬 Part 2 done: LCA(6, 2) = 5 — left returned 6, right returned 2, so 5 is the split point; node 3 just passed the answer up. Now Part 3: p=6, q=5 — one target IS the other’s ancestor. Watch the early stop!'];
+const FINAL_MSG='🏁 Complete! LCA(5,1) = 3 (split at the root) · LCA(6,2) = 5 (deep split) · LCA(6,5) = 5 (ancestor case — the search stopped AT 5 without ever seeing 6). Same recursion, three flavors: split, bubble-up, early stop.';
+
+/* ================= code panel ================= */
+const CODE=[
+  'TreeNode* <span class="fn">lowestCommonAncestor</span>(TreeNode* root, TreeNode* p, TreeNode* q) {',
+  '    <span class="kw">if</span> (root == <span class="nu">NULL</span> || root == p || root == q) {',
+  '        <span class="kw">return</span> root;',
+  '    }',
+  '    TreeNode* left  = <span class="fn">lowestCommonAncestor</span>(root-&gt;left,  p, q);',
+  '    TreeNode* right = <span class="fn">lowestCommonAncestor</span>(root-&gt;right, p, q);',
+  '    <span class="kw">if</span> (left == <span class="nu">NULL</span>) {',
+  '        <span class="kw">return</span> right;   <span class="cm">// both in right subtree</span>',
+  '    } <span class="kw">else if</span> (right == <span class="nu">NULL</span>) {',
+  '        <span class="kw">return</span> left;    <span class="cm">// both in left subtree</span>',
+  '    } <span class="kw">else</span> {',
+  '        <span class="kw">return</span> root;    <span class="cm">// split point!</span>',
+  '    }',
+  '}'];
+
+/* ================= DOM / rendering ================= */
+if(typeof document!=='undefined'){
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('tree');
+function E(tag,attrs,parent){const el=document.createElementNS(NS,tag);for(const k in attrs)el.setAttribute(k,attrs[k]);if(parent)parent.appendChild(el);return el;}
+function marker(defs,id,color){const m=E('marker',{id:id,viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:6.5,markerHeight:6.5,orient:'auto-start-reverse'},defs);E('path',{d:'M0,0L10,5L0,10z',fill:color},m);}
+
+let nodeEls={},aLine=null,gMarks=null;
+function buildSVG(){
+  svg.setAttribute('viewBox',TREE.vb);
+  svg.innerHTML='';
+  nodeEls={};
+  const defs=E('defs',{},svg);
+  marker(defs,'arrDown','#f59e0b');marker(defs,'arrUp','#22c55e');marker(defs,'arrUpNull','#64748b');
+  const gE=E('g',{},svg),gA=E('g',{},svg),gN=E('g',{},svg);
+  gMarks=E('g',{},svg);
+  for(const [a,b] of TREE.edges){
+    const p1=TREE.pos[a],p2=TREE.pos[b];
+    E('line',{x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],class:'edge'},gE);
+  }
+  aLine=E('line',{class:'aline'},gA);aLine.style.display='none';
+  for(const id of TREE.ids){
+    const p=TREE.pos[id],x=p[0],y=p[1],g=E('g',{},gN);
+    const c=E('circle',{cx:x,cy:y,r:26,class:'node'},g);
+    const t=E('text',{x:x,y:y,class:'nval'},g);t.textContent=id;
+    const rc=E('g',{class:'retc'},g);rc.style.display='none';
+    E('rect',{x:x-34,y:y+33,width:68,height:20,rx:7},rc);
+    const rt=E('text',{x:x,y:y+46.5},rc);
+    nodeEls[id]={c:c,rc:rc,rt:rt};
+  }
+}
+buildSVG();
+
+const codeBox=document.getElementById('code');
+CODE.forEach(function(h,i){
+  const d=document.createElement('div');d.className='cl';d.id='cl'+i;
+  d.innerHTML='<span class="ln">'+(i+1)+'</span><span class="lt">'+h+'</span>';
+  codeBox.appendChild(d);
+});
+
+const msgEl=document.getElementById('msg'),stackEl=document.getElementById('stack'),
+      statsEl=document.getElementById('stats'),counterEl=document.getElementById('counter'),
+      scrub=document.getElementById('scrub'),bPlay=document.getElementById('bPlay'),
+      retStatsEl=document.getElementById('retStats'),
+      pBadge=document.getElementById('pBadge'),qBadge=document.getElementById('qBadge'),
+      tl0=document.getElementById('tl0'),tl1=document.getElementById('tl1'),tl2=document.getElementById('tl2'),
+      tm1=document.getElementById('tm1'),tm2=document.getElementById('tm2'),twait=document.getElementById('twait');
+scrub.max=String(LAST);
+
+/* phase tracker */
+const trackEl=document.getElementById('phasetrack'),trackBtns=[];
+PARTS.forEach(function(pt,i){
+  const b=document.createElement('button');
+  b.textContent=pt.short;
+  b.title='Jump to part '+(i+1);
+  b.onclick=function(){stopPlay();setIdx(pt.start);};
+  trackEl.appendChild(b);trackBtns.push(b);
+});
+
+let idx=-1,playing=false,timer=null;
+const delay=()=>1650-Number(document.getElementById('speed').value)*155;
+
+function render(){
+  const ps=phaseState(idx);
+  const part=PARTS[ps.part];
+  let st;
+  if(ps.intro){ st=replayPart(part,-1); st.msg=INTROS[ps.part]; }
+  else st=replay(part,ps.local,ps.part+1);
+  if(idx===LAST)st.msg=FINAL_MSG;
+
+  /* p / q / LCA markers */
+  gMarks.innerHTML='';
+  [['p',part.p,'#38bdf8'],['q',part.q,'#f472b6']].forEach(function(m){
+    const p=TREE.pos[m[1]];
+    E('circle',{cx:p[0],cy:p[1],r:33,class:'pring',stroke:m[2]},gMarks);
+    const t=E('text',{x:p[0],y:p[1]-40,class:'plbl',fill:m[2]},gMarks);
+    t.textContent=m[0].toUpperCase();
+  });
+  if(st.banner&&st.lcaId){
+    const p=TREE.pos[st.lcaId];
+    E('circle',{cx:p[0],cy:p[1],r:36,class:'lring'},gMarks);
+    const t=E('text',{x:p[0],y:p[1]-44,class:'llbl'},gMarks);
+    t.textContent='★ LCA';
+  }
+  /* nodes */
+  const inStack=new Set(st.stack.filter(f=>f.id!=null).map(f=>String(f.id)));
+  for(const id of TREE.ids){
+    const el=nodeEls[id];let cl='node';
+    if(inStack.has(id)&&String(st.current)!==id)cl+=' onstack';
+    if(st.current!=null&&String(st.current)===id)cl+=' current';
+    if(st.banner&&!st.visited.has(id))cl+=' dead';
+    if(st.banner&&st.lcaId===id)cl+=' lca';
+    el.c.setAttribute('class',cl);
+    /* return-value chip */
+    if(id in st.returns){
+      const r=st.returns[id];
+      el.rc.style.display='';
+      const rect=el.rc.querySelector('rect');
+      if(r==null){rect.setAttribute('stroke','#475569');el.rt.setAttribute('fill','#94a3b8');el.rt.textContent='↑ NULL';}
+      else if(st.banner&&st.lcaId===id&&r===id){rect.setAttribute('stroke','#fbbf24');el.rt.setAttribute('fill','#fde68a');el.rt.textContent='★ LCA';}
+      else{rect.setAttribute('stroke','#166534');el.rt.setAttribute('fill','#86efac');el.rt.textContent='↑ node '+r;}
+    } else el.rc.style.display='none';
+  }
+  /* active edge */
+  if(st.edge&&st.edge.a!=='NULL'&&st.edge.b!=='NULL'){
+    const p1=TREE.pos[st.edge.a],p2=TREE.pos[st.edge.b];
+    const dx=p2[0]-p1[0],dy=p2[1]-p1[1],len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len;
+    aLine.setAttribute('x1',p1[0]+ux*28);aLine.setAttribute('y1',p1[1]+uy*28);
+    aLine.setAttribute('x2',p2[0]-ux*(st.edge.dir==='down'?35:30));aLine.setAttribute('y2',p2[1]-uy*(st.edge.dir==='down'?35:30));
+    const cls=st.edge.dir==='down'?'down':(st.edgeNull?'upnull':'up');
+    aLine.setAttribute('class','aline '+cls);
+    aLine.setAttribute('marker-end',st.edge.dir==='down'?'url(#arrDown)':(st.edgeNull?'url(#arrUpNull)':'url(#arrUp)'));
+    aLine.style.display='';
+  } else aLine.style.display='none';
+  /* code highlight */
+  for(let i=0;i<CODE.length;i++)document.getElementById('cl'+i).classList.toggle('hl',st.line===i);
+  /* stack */
+  stackEl.innerHTML='';
+  if(!st.stack.length){
+    stackEl.innerHTML='<div class="empty">'+(st.banner?'all frames returned — the stack is empty again':'the stack is empty — nothing running yet')+'</div>';
+  }
+  st.stack.forEach(function(f,i){
+    const d=document.createElement('div');
+    const isTop=i===st.stack.length-1;
+    const gold=f.stage==='ret'&&f.branch==='split';
+    d.className='frame lc'+(isTop?' top':'')+(f.stage==='ret'?' fret':'')+(gold?' goldret':'');
+    let chips='';
+    if(f.id==null){
+      chips='<span class="res nul">returns NULL</span>';
+    }else if(f.hit==='p'){
+      chips='<span class="chip p">is P ✓</span><span class="res ok">returns node '+f.res+'</span>';
+    }else if(f.hit==='q'){
+      chips='<span class="chip q">is Q ✓</span><span class="res ok">returns node '+f.res+'</span>';
+    }else{
+      if(f.leftRes!==undefined)chips+='<span class="chip '+(f.leftRes==null?'dim':'on')+'">left → '+(f.leftRes==null?'NULL':'node '+f.leftRes)+'</span>';
+      if(f.rightRes!==undefined)chips+='<span class="chip '+(f.rightRes==null?'dim':'on')+'">right → '+(f.rightRes==null?'NULL':'node '+f.rightRes)+'</span>';
+      if(f.stage==='ret'){
+        if(f.branch==='split')chips+='<span class="res gold">★ split → returns root</span>';
+        else if(f.branch==='left')chips+='<span class="res ok">returns left</span>';
+        else chips+='<span class="res ok">returns right</span>';
+      }
+    }
+    const title=f.id!=null?'LCA(node '+f.id+')':'LCA(NULL)';
+    d.innerHTML='<div class="ftitle">🧬 '+title+(isTop?' <span class="toplbl">◂ top</span>':'')+'</div>'+
+                (chips?'<div class="fchips">'+chips+'</div>':'');
+    stackEl.appendChild(d);
+  });
+  /* phase tracker + badges */
+  trackBtns.forEach(function(b,i){
+    const done=idx>=PARTS[i].end,active=(ps.part===i);
+    b.className=done?'done':(active?'active':'');
+    b.textContent=PARTS[i].short+(done?' → LCA '+PARTSUMS[i].lcaId:'');
+  });
+  pBadge.textContent='P = node '+part.p;
+  qBadge.textContent='Q = node '+part.q;
+  /* text bits */
+  msgEl.textContent=st.msg;
+  statsEl.textContent='calls: '+st.calls+' ('+st.nullCalls+' NULL, '+st.earlyStops+' early stop'+(st.earlyStops===1?'':'s')+')';
+  retStatsEl.textContent=st.banner?('LCA = node '+st.lcaId):'searching…';
+  counterEl.textContent='Step '+(idx+1)+' / '+allSteps.length+' · part '+(ps.part+1)+'/3';
+  scrub.value=String(idx);
+  bPlay.textContent=playing?'⏸ Pause':'▶ Play';
+  tl0.classList.toggle('hidden',idx<PARTS[0].end);
+  tm1.classList.toggle('hidden',idx<PARTS[1].start-1);
+  tl1.classList.toggle('hidden',idx<PARTS[1].end);
+  tm2.classList.toggle('hidden',idx<PARTS[2].start-1);
+  tl2.classList.toggle('hidden',idx<LAST);
+  twait.classList.toggle('hidden',idx>=PARTS[0].end);
+}
+
+/* ================= controls ================= */
+function setIdx(v){idx=Math.max(-1,Math.min(LAST,v));render();}
+function stopPlay(){if(playing){playing=false;clearTimeout(timer);render();}}
+function play(){if(idx>=LAST)setIdx(-1);playing=true;render();timer=setTimeout(tick,delay());}
+function tick(){if(!playing)return;if(idx>=LAST){stopPlay();return;}setIdx(idx+1);timer=setTimeout(tick,delay());}
+bPlay.onclick=function(){playing?stopPlay():play();};
+document.getElementById('bReset').onclick=function(){stopPlay();setIdx(-1);};
+document.getElementById('bPrev').onclick=function(){stopPlay();setIdx(idx-1);};
+document.getElementById('bNext').onclick=function(){stopPlay();setIdx(idx+1);};
+document.getElementById('bEnd').onclick=function(){stopPlay();setIdx(LAST);};
+scrub.addEventListener('input',function(){stopPlay();setIdx(Number(scrub.value));});
+document.getElementById('speed').addEventListener('input',function(){
+  if(playing){clearTimeout(timer);timer=setTimeout(tick,delay());}
+});
+document.addEventListener('keydown',function(e){
+  if(e.code==='Space'){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='ArrowRight'){e.preventDefault();stopPlay();setIdx(idx+1);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();stopPlay();setIdx(idx-1);}
+  else if(e.key==='Home'){stopPlay();setIdx(-1);}
+  else if(e.key==='End'){stopPlay();setIdx(LAST);}
+});
+render();
+}
+</script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f"}' crossorigin="anonymous"></script>
+</body>
+</html>
