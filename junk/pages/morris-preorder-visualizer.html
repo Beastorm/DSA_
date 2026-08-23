@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Morris Preorder Traversal</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2c; --panel2:#0d1626; --border:#24324d;
+    --text:#e2e8f0; --muted:#94a3b8;
+    --amber:#f59e0b; --green:#22c55e; --red:#ef4444; --sky:#38bdf8; --pink:#f472b6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1400px;margin:0 auto;padding:18px 16px 30px}
+  h1{margin:0;font-size:20px}
+  .sub{margin:4px 0 14px;color:var(--muted);font-size:13px;max-width:1000px}
+  .sub code{background:#1e293b;border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:11.5px;color:#fbbf24}
+
+  /* layout: left = tree + output, right = code */
+  .layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:12px;align-items:start}
+  .leftcol{display:flex;flex-direction:column;gap:12px;min-width:0}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 16px;min-width:0}
+  .card-title{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .stats{font-weight:500;letter-spacing:0;text-transform:none;color:#7dd3fc;font-size:12px}
+  svg{width:100%;height:auto;display:block}
+
+  /* output strip */
+  .arow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .alab{font:700 11.5px ui-monospace,Menlo,monospace;color:var(--muted);min-width:70px}
+  .cells{display:flex;gap:7px;flex-wrap:wrap}
+  .cell{min-width:46px;height:46px;border-radius:10px;border:1px solid #334155;background:#052e16;display:flex;align-items:center;justify-content:center;font:700 15px ui-monospace,Menlo,monospace;color:#bbf7d0;transition:all .15s;padding:0 6px}
+  .cell.fresh{outline:2px solid var(--amber);outline-offset:1px}
+  .placeholder{color:#475569;font-size:13px;font-style:italic}
+  .legend{margin-top:12px;color:var(--muted);font-size:12px;display:flex;flex-wrap:wrap;gap:14px}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-2px;margin-right:5px}
+  .legend .th{width:22px;height:0;border-top:2.5px dashed var(--pink);border-radius:0}
+
+  /* tree */
+  .edge{stroke:#334155;stroke-width:2}
+  .thread{fill:none;stroke:var(--pink);stroke-width:2.5;stroke-dasharray:6 5}
+  .node{fill:#1e293b;stroke:#64748b;stroke-width:2;transition:fill .2s,stroke .2s}
+  .node.printed{fill:#052e16;stroke:var(--green)}
+  .node.pred{stroke:var(--pink);stroke-width:3.5}
+  .node.current{fill:#7c2d12;stroke:var(--amber);stroke-width:4}
+  .nval{fill:#f1f5f9;font-weight:700;font-size:19px;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+  .curtag{fill:var(--amber);font-size:11px;font-weight:800;text-anchor:middle}
+  .predtag{fill:var(--pink);font-size:11px;font-weight:800;text-anchor:middle}
+
+  /* code */
+  #code{font:11.8px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:8px 0;overflow:auto;max-height:680px}
+  .cl{padding:1px 12px 1px 8px;white-space:pre}
+  .cl .ln{display:inline-block;width:20px;margin-right:12px;text-align:right;color:#475569;user-select:none}
+  .cl.hl{background:rgba(245,158,11,.16);box-shadow:inset 3px 0 0 var(--amber)}
+  .kw{color:#c084fc} .fn{color:#7dd3fc} .nu{color:#fb923c} .nm{color:#4ade80} .cm{color:#64748b;font-style:italic}
+
+  /* message + controls */
+  .msg{margin-top:12px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:11px 16px;font-size:14.5px;min-height:44px;display:flex;align-items:center;gap:10px}
+  .msg::before{content:"💬"}
+  .controls{margin-top:10px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  button{background:#1e293b;color:var(--text);border:1px solid #334155;border-radius:9px;padding:7px 13px;font-size:13.5px;font-weight:600;cursor:pointer}
+  button:hover{background:#273549;border-color:#4a5c7a}
+  #bPlay{background:var(--amber);border-color:var(--amber);color:#1f2937;min-width:96px}
+  #bPlay:hover{background:#fbbf24}
+  #scrub{flex:1;min-width:160px;accent-color:var(--amber);cursor:pointer}
+  .counter{color:var(--muted);font-size:12.5px;white-space:nowrap}
+  .spd{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12.5px}
+  .spd input{accent-color:var(--amber);width:84px;cursor:pointer}
+
+  @media(max-width:900px){.layout{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🧵 Morris Preorder Traversal</h1>
+  <p class="sub">Preorder with <b>O(1) extra space</b>: no stack, no recursion. When a node has a left subtree, a temporary <code>thread</code> is stitched from the subtree's rightmost node back up to the node — so the walk can return without remembering the path. Threads are cut as soon as they're used.</p>
+
+  <div class="layout">
+    <div class="leftcol">
+      <section class="card">
+        <div class="card-title">tree <span class="stats" id="stats"></span></div>
+        <svg id="tree" viewBox="0 0 820 490" aria-label="binary tree with morris threads"></svg>
+      </section>
+
+      <section class="card">
+        <div class="card-title">preorder output</div>
+        <div class="arow"><span class="alab">printed</span><div class="cells" id="outCells"></div></div>
+        <div class="legend">
+          <span><i style="background:#7c2d12;border:2px solid var(--amber)"></i>cur</span>
+          <span><i style="background:#1e293b;border:2px solid var(--pink)"></i>prev (predecessor walk)</span>
+          <span><i style="background:#052e16;border:2px solid var(--green)"></i>already printed</span>
+          <span><i class="th"></i>temporary thread</span>
+        </div>
+      </section>
+    </div>
+
+    <section class="card">
+      <div class="card-title">code</div>
+      <div id="code"></div>
+    </section>
+  </div>
+
+  <div class="msg" id="msg"></div>
+
+  <div class="controls">
+    <button id="bReset" title="Reset">⏮</button>
+    <button id="bPrev" title="Step back">⏴</button>
+    <button id="bPlay" title="Play / Pause">▶ Play</button>
+    <button id="bNext" title="Step forward">⏵</button>
+    <input type="range" id="scrub" min="-1" max="1" value="-1">
+    <span class="counter" id="counter"></span>
+    <label class="spd">🐢 <input type="range" id="speed" min="1" max="10" value="6"> 🐇</label>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================= the tree from main() ================= */
+const TREE={'1':{l:'2',r:'3'},'2':{l:'4',r:'5'},'3':{l:null,r:null},'4':{l:null,r:null},'5':{l:null,r:'6'},'6':{l:null,r:null}};
+const IDS=['1','2','3','4','5','6'];
+const POS={'1':[410,70],'2':[230,185],'3':[590,185],'4':[120,300],'5':[340,300],'6':[440,415]};
+const EDGELIST=[['1','2'],['1','3'],['2','4'],['2','5'],['5','6']];
+
+/* ================= trace generation (exact order of the C++ code) ================= */
+function buildTrace(){
+  const st=[];
+  st.push({t:'init'});
+  const th={};                       /* threaded node -> target (simulates modified right pointers) */
+  const rightOf=function(x){ return TREE[x].r!=null?TREE[x].r:(th[x]||null); };
+  let cur='1';
+  while(cur!=null){
+    const left=TREE[cur].l;
+    if(left==null){
+      st.push({t:'visit',id:cur,branch:1});
+      const nxt=TREE[cur].r!=null?TREE[cur].r:(th[cur]||null);
+      const via=(TREE[cur].r==null&&th[cur])?th[cur]:null;
+      st.push({t:'mover',id:cur,to:nxt,via:via,branch:1});
+      cur=nxt;
+      continue;
+    }
+    st.push({t:'pred-init',id:cur,left:left});
+    let prev=left;
+    while(rightOf(prev)!=null&&rightOf(prev)!==cur){
+      prev=rightOf(prev);
+      st.push({t:'pred-hop',at:prev,cur:cur});
+    }
+    st.push({t:'pred-found',id:cur,prev:prev});
+    if(rightOf(prev)===null){
+      th[prev]=cur;
+      st.push({t:'make',prev:prev,cur:cur});
+      st.push({t:'visit',id:cur,branch:2});
+      st.push({t:'movel',id:cur,to:left});
+      cur=left;
+    }else{
+      delete th[prev];
+      st.push({t:'cut',prev:prev,cur:cur});
+      const nxt=TREE[cur].r!=null?TREE[cur].r:(th[cur]||null);
+      const via=(TREE[cur].r==null&&th[cur])?th[cur]:null;
+      st.push({t:'mover',id:cur,to:nxt,via:via,branch:2});
+      cur=nxt;
+    }
+  }
+  st.push({t:'done'});
+  return st;
+}
+const TRACE=buildTrace();
+const LAST=TRACE.length-1;
+
+/* line map into the code panel */
+const LL={init:2,visit1:5,mover1:6,predInit:8,predHop:10,predFound:11,make:13,visit2:14,movel:15,cut:17,mover2:18,done:22};
+
+/* ================= replay ================= */
+function replay(u){
+  const output=[],threads=new Set();
+  const printed=new Set();
+  let msg='▶ Play — Morris preorder threads its way through the tree.',
+      cur=null,prev=null,line=-1,banner=false,makes=0,cuts=0;
+  for(let k=0;k<=u&&k<TRACE.length;k++){
+    const s=TRACE[k];
+    if(s.t==='init'){
+      cur='1';line=LL.init;
+      msg='🚶 cur = root (node 1) · preorder is empty · no stack, no recursion — just threads';
+    }else if(s.t==='visit'){
+      output.push(s.id);printed.add(s.id);cur=s.id;line=s.branch===1?LL.visit1:LL.visit2;
+      msg='🖨️ print '+s.id+' → preorder = ['+output.join(', ')+']'+(s.branch===2?' (printed BEFORE the left subtree — preorder rule)':' (no left child — print and move on)');
+    }else if(s.t==='mover'){
+      prev=null;line=s.branch===1?LL.mover1:LL.mover2;
+      cur=s.to;
+      if(s.to==null){
+        msg='➡️ cur = NULL → the walk ends';
+      }else if(s.via){
+        msg='➡️ cur = '+s.id+'->right — that’s the THREAD back up to node '+s.via+'! (no stack needed)';
+      }else{
+        msg='➡️ cur = '+s.id+'->right = node '+s.to;
+      }
+    }else if(s.t==='pred-init'){
+      prev=s.left;line=LL.predInit;
+      msg='🔍 node '+s.id+' has a left child → find its inorder predecessor: prev = node '+s.left+', then walk right as far as possible';
+    }else if(s.t==='pred-hop'){
+      prev=s.at;line=LL.predHop;
+      msg='👉 prev walks right → prev = node '+s.at;
+    }else if(s.t==='pred-found'){
+      prev=s.prev;line=LL.predFound;
+      msg='📍 predecessor found: node '+s.prev+' — check its right pointer';
+    }else if(s.t==='make'){
+      threads.add(s.prev+'>'+s.cur);makes++;line=LL.make;
+      msg='🧵 '+s.prev+'->right is free → CREATE thread '+s.prev+' → '+s.cur+' (a bridge back up for later)';
+    }else if(s.t==='movel'){
+      prev=null;cur=s.to;line=LL.movel;
+      msg='⬇️ cur = cur->left = node '+s.to+' (left subtree first)';
+    }else if(s.t==='cut'){
+      threads.delete(s.prev+'>'+s.cur);cuts++;prev=null;line=LL.cut;
+      msg='✂️ thread '+s.prev+' → '+s.cur+' already exists → left subtree fully visited. CUT it ('+s.prev+'->right = NULL) and go right — no print here';
+    }else if(s.t==='done'){
+      banner=true;cur=null;prev=null;line=LL.done;
+      msg='🏁 Morris preorder complete: '+output.join(' ')+' · '+makes+' threads created, '+cuts+' cut — all removed, O(1) extra space ✓';
+    }
+  }
+  return {output:output,threads:threads,printed:printed,msg:msg,cur:cur,prev:prev,line:line,banner:banner,makes:makes,cuts:cuts};
+}
+
+/* ================= code panel ================= */
+const CODE=[
+  '<span class="kw">vector</span>&lt;<span class="kw">int</span>&gt; <span class="fn">getPreorder</span>(TreeNode* root) {',
+  '    <span class="kw">vector</span>&lt;<span class="kw">int</span>&gt; preorder;',
+  '    TreeNode* cur = root;',
+  '    <span class="kw">while</span> (cur != <span class="nu">NULL</span>) {',
+  '        <span class="kw">if</span> (cur-&gt;left == <span class="nu">NULL</span>) {          <span class="cm">// case 1</span>',
+  '            preorder.push_back(cur-&gt;val);',
+  '            cur = cur-&gt;right;',
+  '        } <span class="kw">else</span> {                            <span class="cm">// case 2</span>',
+  '            TreeNode* prev = cur-&gt;left;',
+  '            <span class="kw">while</span> (prev-&gt;right &amp;&amp; prev-&gt;right != cur)',
+  '                prev = prev-&gt;right;',
+  '            <span class="cm">// prev = inorder predecessor of cur</span>',
+  '            <span class="kw">if</span> (prev-&gt;right == <span class="nu">NULL</span>) {',
+  '                prev-&gt;right = cur;          <span class="cm">// make thread</span>',
+  '                preorder.push_back(cur-&gt;val); <span class="cm">// preorder: root first</span>',
+  '                cur = cur-&gt;left;',
+  '            } <span class="kw">else</span> {',
+  '                prev-&gt;right = <span class="nu">NULL</span>;         <span class="cm">// cut thread</span>',
+  '                cur = cur-&gt;right;           <span class="cm">// no print here</span>',
+  '            }',
+  '        }',
+  '    }',
+  '    <span class="kw">return</span> preorder;',
+  '}'];
+
+/* ================= DOM ================= */
+if(typeof document!=='undefined'){
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('tree');
+function E(tag,attrs,parent){const el=document.createElementNS(NS,tag);for(const k in attrs)el.setAttribute(k,attrs[k]);if(parent)parent.appendChild(el);return el;}
+function marker(defs,id,color){const m=E('marker',{id:id,viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:6.5,markerHeight:6.5,orient:'auto-start-reverse'},defs);E('path',{d:'M0,0L10,5L0,10z',fill:color},m);}
+
+const defs=E('defs',{},svg);
+marker(defs,'arrThread','#f472b6');
+const gE=E('g',{},svg),gT=E('g',{},svg),gN=E('g',{},svg),gLbl=E('g',{},svg);
+EDGELIST.forEach(function(pr){
+  const p1=POS[pr[0]],p2=POS[pr[1]];
+  E('line',{x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],class:'edge'},gE);
+});
+const nodeEls={};
+IDS.forEach(function(id){
+  const p=POS[id],g=E('g',{},gN);
+  const c=E('circle',{cx:p[0],cy:p[1],r:26,class:'node'},g);
+  const t=E('text',{x:p[0],y:p[1],class:'nval'},g);t.textContent=id;
+  nodeEls[id]={c:c};
+});
+
+/* curved thread path between two nodes, bulging away from the tree center */
+function threadD(a,b){
+  const p1=POS[a],p2=POS[b];
+  const mx=(p1[0]+p2[0])/2,my=(p1[1]+p2[1])/2;
+  const dx=p2[0]-p1[0],dy=p2[1]-p1[1],len=Math.hypot(dx,dy)||1;
+  let px=-dy/len,py=dx/len;
+  if((mx<410&&px>0)||(mx>=410&&px<0)){px=-px;py=-py;}
+  const cx=mx+px*70,cy=my+py*70;
+  const trim=function(p,cx2,cy2,r){
+    const ddx=cx2-p[0],ddy=cy2-p[1],dl=Math.hypot(ddx,ddy)||1;
+    return [p[0]+ddx/dl*r,p[1]+ddy/dl*r];
+  };
+  const s=trim(p1,cx,cy,30),e=trim(p2,cx,cy,34);
+  return 'M '+s[0]+' '+s[1]+' Q '+cx+' '+cy+' '+e[0]+' '+e[1];
+}
+
+const codeBox=document.getElementById('code');
+CODE.forEach(function(h,i){
+  const d=document.createElement('div');d.className='cl';d.id='cl'+i;
+  d.innerHTML='<span class="ln">'+(i+1)+'</span><span class="lt">'+h+'</span>';
+  codeBox.appendChild(d);
+});
+
+const outCells=document.getElementById('outCells'),msgEl=document.getElementById('msg'),
+      counterEl=document.getElementById('counter'),scrub=document.getElementById('scrub'),
+      bPlay=document.getElementById('bPlay'),statsEl=document.getElementById('stats');
+scrub.max=String(LAST);
+
+let idx=-1,playing=false,timer=null;
+const delay=()=>1650-Number(document.getElementById('speed').value)*155;
+
+function render(){
+  const st=replay(idx);
+  /* threads */
+  gT.innerHTML='';
+  st.threads.forEach(function(t){
+    const pr=t.split('>');
+    const p=E('path',{d:threadD(pr[0],pr[1]),class:'thread'},gT);
+    p.setAttribute('marker-end','url(#arrThread)');
+  });
+  /* nodes */
+  IDS.forEach(function(id){
+    let cl='node';
+    if(st.printed.has(id))cl+=' printed';
+    if(st.prev===id)cl+=' pred';
+    if(st.cur===id)cl+=' current';
+    nodeEls[id].c.setAttribute('class',cl);
+  });
+  /* cur / prev tags */
+  gLbl.innerHTML='';
+  if(st.cur!=null){
+    const p=POS[st.cur];
+    const t=E('text',{x:p[0],y:p[1]-36,class:'curtag'},gLbl);
+    t.textContent='cur';
+  }
+  if(st.prev!=null&&st.prev!==st.cur){
+    const p=POS[st.prev];
+    const t=E('text',{x:p[0],y:p[1]+44,class:'predtag'},gLbl);
+    t.textContent='prev';
+  }
+  /* output strip */
+  outCells.innerHTML='';
+  if(!st.output.length){outCells.innerHTML='<span class="placeholder">nothing printed yet…</span>';}
+  st.output.forEach(function(v,i){
+    const d=document.createElement('div');
+    d.className='cell'+(i===st.output.length-1&&!st.banner?' fresh':'');
+    d.textContent=v;
+    outCells.appendChild(d);
+  });
+  /* code highlight */
+  for(let i=0;i<CODE.length;i++)document.getElementById('cl'+i).classList.toggle('hl',st.line===i);
+  /* text */
+  msgEl.textContent=st.msg;
+  statsEl.textContent='threads: '+st.threads.size+' active · '+st.makes+' made / '+st.cuts+' cut';
+  counterEl.textContent=(idx+1)+' / '+TRACE.length;
+  scrub.value=String(idx);
+  bPlay.textContent=playing?'⏸ Pause':'▶ Play';
+}
+
+function setIdx(v){idx=Math.max(-1,Math.min(LAST,v));render();}
+function stopPlay(){if(playing){playing=false;clearTimeout(timer);render();}}
+function play(){if(idx>=LAST)setIdx(-1);playing=true;render();timer=setTimeout(tick,delay());}
+function tick(){if(!playing)return;if(idx>=LAST){stopPlay();return;}setIdx(idx+1);timer=setTimeout(tick,delay());}
+bPlay.onclick=function(){playing?stopPlay():play();};
+document.getElementById('bReset').onclick=function(){stopPlay();setIdx(-1);};
+document.getElementById('bPrev').onclick=function(){stopPlay();setIdx(idx-1);};
+document.getElementById('bNext').onclick=function(){stopPlay();setIdx(idx+1);};
+scrub.addEventListener('input',function(){stopPlay();setIdx(Number(scrub.value));});
+document.getElementById('speed').addEventListener('input',function(){
+  if(playing){clearTimeout(timer);timer=setTimeout(tick,delay());}
+});
+document.addEventListener('keydown',function(e){
+  if(e.code==='Space'){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='ArrowRight'){e.preventDefault();stopPlay();setIdx(idx+1);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();stopPlay();setIdx(idx-1);}
+});
+render();
+}
+</script>
+</body>
+</html>
