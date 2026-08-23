@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Serialize & Deserialize Binary Tree</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2c; --panel2:#0d1626; --border:#24324d;
+    --text:#e2e8f0; --muted:#94a3b8;
+    --amber:#f59e0b; --green:#22c55e; --red:#ef4444; --sky:#38bdf8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1400px;margin:0 auto;padding:18px 16px 30px}
+  h1{margin:0;font-size:20px}
+  .sub{margin:4px 0 14px;color:var(--muted);font-size:13px}
+  .sub code{background:#1e293b;border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:11.5px;color:#fbbf24}
+
+  /* layout: left = tree + string, right = code */
+  .layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:12px;align-items:start}
+  .leftcol{display:flex;flex-direction:column;gap:12px;min-width:0}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 16px;min-width:0}
+  .card-title{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .partbadge{font:700 11px ui-monospace,Menlo,monospace;letter-spacing:0;border-radius:7px;padding:3px 9px;text-transform:none}
+  .partbadge.ser{color:#fde68a;background:#4a3a06;border:1px solid var(--amber)}
+  .partbadge.des{color:#bbf7d0;background:#052e16;border:1px solid var(--green)}
+  svg{width:100%;height:auto;display:block}
+
+  /* cells / tokens */
+  .arow{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}
+  .alab{font:700 11.5px ui-monospace,Menlo,monospace;color:var(--muted);min-width:58px}
+  .cells{display:flex;gap:7px;flex-wrap:wrap}
+  .cell{min-width:44px;height:46px;border-radius:10px;border:1px solid #334155;background:#0f1a2e;display:flex;align-items:center;justify-content:center;font:700 15px ui-monospace,Menlo,monospace;color:#e2e8f0;transition:all .15s;padding:0 6px}
+  .cell.dim{opacity:.3}
+  .cell.nullq{border-style:dashed;color:#64748b;font-size:13px}
+  .cell.hashtok{background:#1e293b;border-color:#64748b;color:#f87171}
+  .cell.fresh{outline:2px solid var(--amber);outline-offset:1px}
+  .cell.ptr{outline:2px solid var(--amber);outline-offset:1px}
+  .cell.used{opacity:.35}
+  .legend{margin-top:14px;color:var(--muted);font-size:12px;display:flex;flex-wrap:wrap;gap:12px}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:4px;vertical-align:-2px;margin-right:5px}
+
+  /* tree */
+  .edge{stroke:#334155;stroke-width:2;opacity:0;transition:opacity .3s}
+  .edge.built{opacity:1;stroke:var(--sky);stroke-width:2.5}
+  .node{fill:#1e293b;stroke:#64748b;stroke-width:2;opacity:0;transition:opacity .3s,fill .2s,stroke .2s}
+  .node.built{opacity:1;fill:#0c4a6e;stroke:var(--sky)}
+  .node.current{fill:#7c2d12;stroke:var(--amber);stroke-width:4}
+  .node.serialized{fill:#052e16;stroke:var(--green)}
+  .nval{fill:#f1f5f9;font-weight:700;font-size:19px;text-anchor:middle;dominant-baseline:central;pointer-events:none;opacity:0;transition:opacity .3s}
+  .nval.built{opacity:1}
+
+  /* code */
+  #code{font:11.8px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:8px 0;overflow:auto;max-height:680px}
+  .cl{padding:1px 12px 1px 8px;white-space:pre}
+  .cl .ln{display:inline-block;width:20px;margin-right:12px;text-align:right;color:#475569;user-select:none}
+  .cl.hl{background:rgba(245,158,11,.16);box-shadow:inset 3px 0 0 var(--amber)}
+  .kw{color:#c084fc} .fn{color:#7dd3fc} .nu{color:#fb923c} .nm{color:#4ade80} .cm{color:#64748b;font-style:italic}
+
+  /* message + controls */
+  .msg{margin-top:12px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:11px 16px;font-size:14.5px;min-height:44px;display:flex;align-items:center;gap:10px}
+  .msg::before{content:"💬"}
+  .controls{margin-top:10px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  button{background:#1e293b;color:var(--text);border:1px solid #334155;border-radius:9px;padding:7px 13px;font-size:13.5px;font-weight:600;cursor:pointer}
+  button:hover{background:#273549;border-color:#4a5c7a}
+  #bPlay{background:var(--amber);border-color:var(--amber);color:#1f2937;min-width:96px}
+  #bPlay:hover{background:#fbbf24}
+  #scrub{flex:1;min-width:160px;accent-color:var(--amber);cursor:pointer}
+  .counter{color:var(--muted);font-size:12.5px;white-space:nowrap}
+  .spd{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12.5px}
+  .spd input{accent-color:var(--amber);width:84px;cursor:pointer}
+
+  @media(max-width:900px){.layout{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📦 Serialize &amp; Deserialize a Binary Tree</h1>
+  <p class="sub">Part 1 — <code>serialize</code>: BFS the tree and emit each node's value, writing <code>#</code> for nulls (children of nulls are never enqueued). Part 2 — <code>deserialize</code>: read the tokens back; every dequeued node consumes exactly <b>two</b> tokens for its children, rebuilding the identical tree.</p>
+
+  <div class="layout">
+    <div class="leftcol">
+      <section class="card">
+        <div class="card-title">binary tree <span class="partbadge" id="partBadge">part 1 · serialize</span></div>
+        <svg id="tree" viewBox="0 0 820 412" aria-label="binary tree"></svg>
+      </section>
+
+      <section class="card">
+        <div class="card-title" id="strTitle">serialized string &amp; BFS queue</div>
+        <div class="arow"><span class="alab">string</span><div class="cells" id="tokCells"></div></div>
+        <div class="arow"><span class="alab">queue</span><div class="cells" id="qCells"></div></div>
+        <div class="legend">
+          <span><i style="background:#7c2d12;border:1px solid var(--amber)"></i>current (front of queue)</span>
+          <span><i style="background:#052e16;border:1px solid var(--green)"></i>already serialized</span>
+          <span><i style="background:#0c4a6e;border:1px solid var(--sky)"></i>built / in queue</span>
+          <span><i style="background:#1e293b;border:1px solid #64748b"></i># = null marker</span>
+        </div>
+      </section>
+    </div>
+
+    <section class="card">
+      <div class="card-title">code</div>
+      <div id="code"></div>
+    </section>
+  </div>
+
+  <div class="msg" id="msg"></div>
+
+  <div class="controls">
+    <button id="bReset" title="Reset">⏮</button>
+    <button id="bPrev" title="Step back">⏴</button>
+    <button id="bPlay" title="Play / Pause">▶ Play</button>
+    <button id="bNext" title="Step forward">⏵</button>
+    <input type="range" id="scrub" min="-1" max="1" value="-1">
+    <span class="counter" id="counter"></span>
+    <label class="spd">🐢 <input type="range" id="speed" min="1" max="10" value="6"> 🐇</label>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================= the tree from main() ================= */
+const CHILDREN={'1':{l:'2',r:'3'},'2':{l:null,r:null},'3':{l:'4',r:'5'},'4':{l:null,r:null},'5':{l:null,r:null}};
+const IDS=['1','2','3','4','5'];
+const POS={'1':[410,80],'2':[240,210],'3':[580,210],'4':[470,340],'5':[690,340]};
+const EDGELIST=[['1','2'],['1','3'],['3','4'],['3','5']];
+const TOKENS=['1','2','3','#','#','4','5','#','#','#','#'];
+const INORDER='2 1 4 3 5';
+
+/* ================= traces ================= */
+function buildSerTrace(){
+  const st=[];
+  st.push({t:'ser-init'});
+  const q=['1'];
+  while(q.length){
+    const it=q.shift();
+    if(it===null){ st.push({t:'ser-null'}); continue; }
+    st.push({t:'ser-node',id:it});
+    q.push(CHILDREN[it].l,CHILDREN[it].r);
+  }
+  st.push({t:'ser-done'});
+  return st;
+}
+function buildDesTrace(){
+  const st=[];
+  st.push({t:'des-init'});
+  const q=['1'];let idx=1;
+  while(q.length){
+    const node=q.shift();
+    st.push({t:'des-pop',id:node});
+    const lt=TOKENS[idx++];
+    st.push({t:'des-left',id:node,tok:lt});
+    if(lt!=='#')q.push(lt);
+    const rt=TOKENS[idx++];
+    st.push({t:'des-right',id:node,tok:rt});
+    if(rt!=='#')q.push(rt);
+  }
+  st.push({t:'des-done'});
+  return st;
+}
+
+const PARTS=[
+  {kind:'ser', trace:buildSerTrace()},
+  {kind:'des', trace:buildDesTrace()}
+];
+let allSteps=[];
+PARTS.forEach(function(p,i){ if(i>0)allSteps.push({t:'intro',part:i}); p.start=allSteps.length; allSteps=allSteps.concat(p.trace); p.end=allSteps.length-1; });
+const LAST=allSteps.length-1;
+function phaseState(u){
+  if(u<0)return {part:0,local:-1,intro:false};
+  if(u===PARTS[1].start-1)return {part:1,local:-1,intro:true};
+  if(u>=PARTS[1].start)return {part:1,local:u-PARTS[1].start,intro:false};
+  return {part:0,local:u-PARTS[0].start,intro:false};
+}
+
+/* line maps into the combined code panel */
+const LS={init:3,node:9,nul:7,done:14};
+const LD={init:21,pop:24,leftHash:25,leftNode:27,rightHash:30,rightNode:32,done:36};
+
+/* ================= replay ================= */
+function replaySer(u){
+  const out=[],queue=[],serialized=new Set();
+  let msg='▶ Play — serialize walks the tree level by level.',
+      current=null,banner=false,line=-1;
+  for(let k=0;k<=u&&k<PARTS[0].trace.length;k++){
+    const s=PARTS[0].trace[k];
+    if(s.t==='ser-init'){
+      queue.length=0;queue.push('1');line=LS.init;
+      msg='📦 serialize: queue = [1], the output string starts empty';
+    }else if(s.t==='ser-node'){
+      queue.shift();serialized.add(s.id);out.push(s.id);current=s.id;line=LS.node;
+      queue.push(CHILDREN[s.id].l,CHILDREN[s.id].r);
+      msg='📤 pop node '+s.id+' → append "'+s.id+'," · enqueue its children (even the null ones!)';
+    }else if(s.t==='ser-null'){
+      queue.shift();out.push('#');current=null;line=LS.nul;
+      msg='📤 pop null → append "#," — this is how the shape is preserved';
+    }else if(s.t==='ser-done'){
+      banner=true;current=null;line=LS.done;
+      msg='✅ serialized = "'+out.join(',')+'," — every level fully encoded, nulls included';
+    }
+  }
+  return {out:out,queue:queue,serialized:serialized,msg:msg,current:current,banner:banner,line:line};
+}
+function replayDes(u){
+  const grown=new Set(),edges=new Set(),queue=[];
+  let readIdx=0,msg='▶ Play — deserialize reads the tokens back.',
+      current=null,banner=false,line=-1;
+  for(let k=0;k<=u&&k<PARTS[1].trace.length;k++){
+    const s=PARTS[1].trace[k];
+    if(s.t==='des-init'){
+      grown.add('1');queue.length=0;queue.push('1');readIdx=1;line=LD.init;
+      msg='📥 read first token "1" → create the root, queue = [1]';
+    }else if(s.t==='des-pop'){
+      queue.shift();current=s.id;line=LD.pop;
+      msg='📤 pop node '+s.id+' — now read its two child tokens';
+    }else if(s.t==='des-left'){
+      readIdx++;line=s.tok==='#'?LD.leftHash:LD.leftNode;
+      if(s.tok==='#'){
+        msg='⬅️ token "#" → node '+s.id+'’s LEFT child stays null';
+      }else{
+        grown.add(s.tok);edges.add(s.id+'>'+s.tok);queue.push(s.tok);
+        msg='⬅️ token "'+s.tok+'" → create LEFT child '+s.tok+' of '+s.id+', enqueue it';
+      }
+    }else if(s.t==='des-right'){
+      readIdx++;line=s.tok==='#'?LD.rightHash:LD.rightNode;
+      if(s.tok==='#'){
+        msg='➡️ token "#" → node '+s.id+'’s RIGHT child stays null';
+      }else{
+        grown.add(s.tok);edges.add(s.id+'>'+s.tok);queue.push(s.tok);
+        msg='➡️ token "'+s.tok+'" → create RIGHT child '+s.tok+' of '+s.id+', enqueue it';
+      }
+    }else if(s.t==='des-done'){
+      banner=true;current=null;line=LD.done;
+      msg='✅ tree rebuilt! inorder: '+INORDER+' — identical to the original ✓';
+    }
+  }
+  return {grown:grown,edges:edges,queue:queue,readIdx:readIdx,msg:msg,current:current,banner:banner,line:line};
+}
+function replay(part,u){return part.kind==='ser'?replaySer(u):replayDes(u);}
+
+/* ================= code panel ================= */
+const CODE=[
+  '<span class="kw">string</span> <span class="fn">serialize</span>(TreeNode* root) {',
+  '    <span class="kw">if</span> (!root) <span class="kw">return</span> <span class="nu">""</span>;',
+  '    <span class="kw">string</span> s = <span class="nu">""</span>;',
+  '    <span class="kw">queue</span>&lt;TreeNode*&gt; q; q.push(root);',
+  '    <span class="kw">while</span> (!q.empty()) {',
+  '        TreeNode* curNode = q.front(); q.pop();',
+  '        <span class="kw">if</span> (curNode == <span class="nu">nullptr</span>) {',
+  '            s += <span class="nu">"#,"</span>;',
+  '        } <span class="kw">else</span> {',
+  '            s += <span class="fn">to_string</span>(curNode-&gt;val) + <span class="nu">","</span>;',
+  '            q.push(curNode-&gt;left);',
+  '            q.push(curNode-&gt;right);',
+  '        }',
+  '    }',
+  '    <span class="kw">return</span> s;',
+  '}',
+  '',
+  'TreeNode* <span class="fn">deserialize</span>(<span class="kw">string</span> data) {',
+  '    <span class="kw">if</span> (data.empty()) <span class="kw">return</span> <span class="nu">nullptr</span>;',
+  '    <span class="kw">stringstream</span> s(data); <span class="kw">string</span> str;',
+  '    <span class="fn">getline</span>(s, str, <span class="nu">\',\'</span>);',
+  '    TreeNode* root = <span class="kw">new</span> <span class="fn">TreeNode</span>(<span class="fn">stoi</span>(str));',
+  '    <span class="kw">queue</span>&lt;TreeNode*&gt; q; q.push(root);',
+  '    <span class="kw">while</span> (!q.empty()) {',
+  '        TreeNode* node = q.front(); q.pop();',
+  '        <span class="fn">getline</span>(s, str, <span class="nu">\',\'</span>);   <span class="cm">// left token</span>',
+  '        <span class="kw">if</span> (str != <span class="nu">"#"</span>) {',
+  '            node-&gt;left = <span class="kw">new</span> <span class="fn">TreeNode</span>(<span class="fn">stoi</span>(str));',
+  '            q.push(node-&gt;left);',
+  '        }',
+  '        <span class="fn">getline</span>(s, str, <span class="nu">\',\'</span>);   <span class="cm">// right token</span>',
+  '        <span class="kw">if</span> (str != <span class="nu">"#"</span>) {',
+  '            node-&gt;right = <span class="kw">new</span> <span class="fn">TreeNode</span>(<span class="fn">stoi</span>(str));',
+  '            q.push(node-&gt;right);',
+  '        }',
+  '    }',
+  '    <span class="kw">return</span> root;',
+  '}'];
+
+/* ================= DOM ================= */
+if(typeof document!=='undefined'){
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('tree');
+function E(tag,attrs,parent){const el=document.createElementNS(NS,tag);for(const k in attrs)el.setAttribute(k,attrs[k]);if(parent)parent.appendChild(el);return el;}
+
+const gE=E('g',{},svg),gN=E('g',{},svg);
+const edgeEls={};
+EDGELIST.forEach(function(pr){
+  const p1=POS[pr[0]],p2=POS[pr[1]];
+  const ln=E('line',{x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],class:'edge'},gE);
+  edgeEls[pr[0]+'>'+pr[1]]=ln;
+});
+const nodeEls={};
+IDS.forEach(function(id){
+  const p=POS[id],g=E('g',{},gN);
+  const c=E('circle',{cx:p[0],cy:p[1],r:26,class:'node'},g);
+  const t=E('text',{x:p[0],y:p[1],class:'nval'},g);t.textContent=id;
+  nodeEls[id]={c:c,t:t};
+});
+
+const codeBox=document.getElementById('code');
+CODE.forEach(function(h,i){
+  const d=document.createElement('div');d.className='cl';d.id='cl'+i;
+  d.innerHTML='<span class="ln">'+(i+1)+'</span><span class="lt">'+h+'</span>';
+  codeBox.appendChild(d);
+});
+
+const tokCells=document.getElementById('tokCells'),qCells=document.getElementById('qCells'),
+      msgEl=document.getElementById('msg'),counterEl=document.getElementById('counter'),
+      scrub=document.getElementById('scrub'),bPlay=document.getElementById('bPlay'),
+      partBadge=document.getElementById('partBadge'),strTitle=document.getElementById('strTitle');
+scrub.max=String(LAST);
+
+const INTRO_MSG='🎬 Part 1 done: the tree became "'+TOKENS.join(',')+'," — the # markers remember exactly where branches end. Now Part 2: read the tokens back one by one and rebuild the identical tree.';
+const FINAL_MSG='🏁 Complete! serialize → "'+TOKENS.join(',')+'," and deserialize rebuilt the identical tree (inorder '+INORDER+' both times). The BFS order guarantees every node’s two child tokens appear right after the node itself.';
+
+let idx=-1,playing=false,timer=null;
+const delay=()=>1650-Number(document.getElementById('speed').value)*155;
+
+function render(){
+  const ps=phaseState(idx);
+  const part=PARTS[ps.part];
+  let st;
+  if(ps.intro){ st=replay(part,-1); st.msg=INTRO_MSG; }
+  else st=replay(part,ps.local);
+  if(idx===LAST)st.msg=FINAL_MSG;
+
+  /* badge + title */
+  partBadge.className='partbadge '+part.kind;
+  partBadge.textContent=part.kind==='ser'?'part 1 · serialize: tree → string':'part 2 · deserialize: string → tree';
+  strTitle.textContent=part.kind==='ser'?'serialized string (output) & BFS queue':'token stream (input) & BFS queue';
+
+  /* tree */
+  IDS.forEach(function(id){
+    const el=nodeEls[id];
+    if(part.kind==='ser'){
+      let cl='node built';
+      if(st.serialized.has(id))cl+=' serialized';
+      if(st.current===id)cl+=' current';
+      el.c.setAttribute('class',cl);
+      el.t.setAttribute('class','nval built');
+    }else{
+      const built=st.grown.has(id);
+      el.c.setAttribute('class','node'+(built?' built':'')+(built&&st.current===id?' current':''));
+      el.t.setAttribute('class','nval'+(built?' built':''));
+    }
+  });
+  for(const key in edgeEls){
+    if(part.kind==='ser')edgeEls[key].setAttribute('class','edge built');
+    else edgeEls[key].setAttribute('class','edge'+(st.edges.has(key)?' built':''));
+  }
+
+  /* token strip */
+  tokCells.innerHTML='';
+  if(part.kind==='ser'){
+    if(!st.out.length){tokCells.innerHTML='<span class="cell dim">(empty)</span>';}
+    st.out.forEach(function(tok,i){
+      const d=document.createElement('div');
+      d.className='cell'+(tok==='#'?' hashtok':'')+(i===st.out.length-1&&!st.banner?' fresh':'');
+      d.textContent=tok;
+      tokCells.appendChild(d);
+    });
+  }else{
+    TOKENS.forEach(function(tok,i){
+      const d=document.createElement('div');
+      let cl='cell'+(tok==='#'?' hashtok':'');
+      if(i<st.readIdx)cl+=' used';
+      if(i===st.readIdx&&!st.banner)cl+=' ptr';
+      d.className=cl;
+      d.textContent=tok;
+      tokCells.appendChild(d);
+    });
+  }
+  /* queue */
+  qCells.innerHTML='';
+  if(!st.queue.length){qCells.innerHTML='<span class="cell dim">(empty)</span>';}
+  st.queue.forEach(function(it,i){
+    const d=document.createElement('div');
+    d.className='cell'+(it===null?' nullq':'')+(i===0?' fresh':'');
+    d.textContent=it===null?'∅':it;
+    qCells.appendChild(d);
+  });
+
+  /* code highlight */
+  for(let i=0;i<CODE.length;i++)document.getElementById('cl'+i).classList.toggle('hl',st.line===i);
+  /* text */
+  msgEl.textContent=st.msg;
+  counterEl.textContent=(idx+1)+' / '+allSteps.length;
+  scrub.value=String(idx);
+  bPlay.textContent=playing?'⏸ Pause':'▶ Play';
+}
+
+function setIdx(v){idx=Math.max(-1,Math.min(LAST,v));render();}
+function stopPlay(){if(playing){playing=false;clearTimeout(timer);render();}}
+function play(){if(idx>=LAST)setIdx(-1);playing=true;render();timer=setTimeout(tick,delay());}
+function tick(){if(!playing)return;if(idx>=LAST){stopPlay();return;}setIdx(idx+1);timer=setTimeout(tick,delay());}
+bPlay.onclick=function(){playing?stopPlay():play();};
+document.getElementById('bReset').onclick=function(){stopPlay();setIdx(-1);};
+document.getElementById('bPrev').onclick=function(){stopPlay();setIdx(idx-1);};
+document.getElementById('bNext').onclick=function(){stopPlay();setIdx(idx+1);};
+scrub.addEventListener('input',function(){stopPlay();setIdx(Number(scrub.value));});
+document.getElementById('speed').addEventListener('input',function(){
+  if(playing){clearTimeout(timer);timer=setTimeout(tick,delay());}
+});
+document.addEventListener('keydown',function(e){
+  if(e.code==='Space'){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='ArrowRight'){e.preventDefault();stopPlay();setIdx(idx+1);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();stopPlay();setIdx(idx-1);}
+});
+render();
+}
+</script>
+</body>
+</html>
